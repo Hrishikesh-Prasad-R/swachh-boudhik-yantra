@@ -1,0 +1,12 @@
+# Build output
+build/
+
+# Logs (runtime generated)
+logs/
+
+# Editor/IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
