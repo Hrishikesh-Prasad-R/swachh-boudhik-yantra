@@ -1,12 +1,66 @@
-# Build output
+# ─────────────────────────────────────────────────────────────
+# Swachh Boudhik Yantra — .gitignore
+# ─────────────────────────────────────────────────────────────
+
+# ── Python ────────────────────────────────────────────────────
+# Virtual environments (reproducible via setup.sh / pip install)
+venv/
+.venv/
+env/
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── C++ Build Artifacts ───────────────────────────────────────
+# CMake build output (regenerated via scripts/run.sh)
 build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
 
-# Logs (runtime generated)
+# Compiled binaries (built from source)
+*.o
+*.a
+*.so
+*.out
+
+# ── Binaries / Large Executables ─────────────────────────────
+# Bundled arduino-cli binary (downloaded by setup.sh if needed)
+bin/arduino-cli
+Manual\ mode/bin/
+Manual\ mode/hmi/scripts/bin/
+
+# ── Runtime Generated ─────────────────────────────────────────
+# Log files (written at runtime by HMI logger)
 logs/
+*.log
 
-# Editor/IDE files
+# ── Calibration ───────────────────────────────────────────────
+# KEEP: stereo_calib.npz and calibration_values.yaml are tracked
+# They are hardware-specific and cannot be regenerated without
+# the physical camera rig. They are small (< 5KB).
+# (No entries here — these files are intentionally tracked)
+
+# ── Models ────────────────────────────────────────────────────
+# KEEP: .onnx and .pt model files are intentionally tracked.
+# They are required to run and are under GitHub's 100MB limit.
+# (No entries here — model files are intentionally tracked)
+
+# ── Editor / IDE ──────────────────────────────────────────────
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
-.vscode/
-.idea/
+.DS_Store
+
+# ── Streamlit ─────────────────────────────────────────────────
+# Streamlit cache
+.streamlit/
+
+# ── Misc ──────────────────────────────────────────────────────
+*.egg-info/
+dist/

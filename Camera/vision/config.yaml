@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────
+# Swachh Boudhik Yantra — MVP Configuration
+# ─────────────────────────────────────────────
+
+# ── Camera ────────────────────────────────────
+camera:
+  left_device: 0          # /dev/video0
+  right_device: 1         # /dev/video1 (NOT video2 — that's a metadata node)
+  width: 640
+  height: 480
+  fps: 10
+  # v4l2 settings to match calib.sh
+  exposure: 151
+  brightness: 108
+  gain: 34
+  auto_exposure: 1        # 1 = manual
+  auto_white_balance: 0
+  power_line_frequency: 1 # 50 Hz
+
+# ── Inference ─────────────────────────────────
+inference:
+  onnx_path: "models/yolov8s.onnx"
+  # engine_path: "models/yolov8s.engine" (Jetson only)
+  input_size: 640         # square input
+  # false = grayscale tiled to 3ch (default, faster, BW cameras)
+  # true  = full color BGR (switch if accuracy is poor)
+  use_color: false
+  conf_threshold: 0.50
+  iou_threshold: 0.60
+  frame_skip: 1           # run inference every N frames (1 = every frame)
+
+  # COCO class IDs to detect — small/holdable objects
+  # Full list: https://cocodataset.org/#explore
+  # 39=bottle 41=cup 67=cell phone 73=book 76=scissors
+  # 77=teddy bear 78=hair drier 79=toothbrush
+  # 25=umbrella  56=chair (exclude large), 44=bottle cap (not in COCO)
+  # Keep: bottle, cup, scissors, cell phone, book, toothbrush, remote
+  allowed_class_ids: [39, 41, 65, 67, 73, 76, 79]
+  # 39=bottle, 41=cup, 65=remote, 67=cell phone, 73=book, 76=scissors, 79=toothbrush
+
+# ── Depth Estimation ──────────────────────────
+depth:
+  calib_file: "calib/stereo_calib.npz"   # set by redo-calibration
+  # StereoSGBM parameters
+  min_disparity: 0
+  num_disparities: 64     # must be divisible by 16
+  block_size: 9
+  p1_coeff: 8             # P1 = coeff * blockSize^2
+  p2_coeff: 32            # P2 = coeff * blockSize^2
+  disp12_max_diff: 1
+  uniqueness_ratio: 10
+  speckle_window_size: 100
+  speckle_range: 32
+  # Fallback (when no calib): assume object height in cm
+  # Distance = (ref_object_height_cm * focal_px) / bbox_height_px
+  fallback_ref_object_height_cm: 12.0  # typical small bottle ~12cm
+  fallback_focal_px: 600               # rough estimate for C270 @ 640px
+
+# ── Serial (Arduino) ──────────────────────────
+serial:
+  port: "/dev/ttyACM0"    # try /dev/ttyUSB0 if this doesn't work
+  baud: 115200
+  timeout: 0.5            # seconds to wait for ACK
+  # Send coordinates only when confidence > this threshold
+  min_conf_to_send: 0.55
+  # Require N consecutive detections of same class before sending
+  stable_frames: 2
+
+# ── Display ───────────────────────────────────
+display:
+  window_name: "Swachh MVP — Object Detection"
+  show_fps: true
+  show_depth: true
+  show_serial_status: true
+  # Color for bounding boxes (BGR)
+  box_color: [0, 255, 80]
+  text_color: [255, 255, 255]

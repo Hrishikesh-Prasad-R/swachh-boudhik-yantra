@@ -1,0 +1,27 @@
+# Stereo Calibration Values
+# Generated: 2026-03-26 13:14:48
+# Source: /tmp/calibrationdata.tar.gz
+# Overwritten each time calib.sh is run.
+
+image_size:
+  width:  640
+  height: 480
+
+derived:
+  focal_px:       1611.1562      # fx from left P matrix
+  baseline:       0.153367   # units = same as T (usually metres from ROS)
+  cx0:            681.9205        # principal point x (left)
+  cy0:            284.1711        # principal point y (left)
+  depth_formula:  "Z = focal * baseline / disparity"
+
+left_camera:
+  K1:  [1068.23362, 0.0, 426.69779, 0.0, 1082.9771, 332.20139, 0.0, 0.0, 1.0]    # 3x3 intrinsic matrix (row-major)
+  D1:  [0.33157, -0.338107, 0.034967, 0.047483, 0.0]    # distortion [k1,k2,p1,p2,k3]
+  R1:  [0.969091, 0.141113, -0.202361, -0.137977, 0.989993, 0.029592, 0.204512, -0.000756, 0.978864]    # 3x3 rectification matrix
+  P1:  [1611.15619, 0.0, 681.92049, 0.0, 0.0, 1611.15619, 284.17106, 0.0, 0.0, 0.0, 1.0, 0.0]    # 3x4 projection matrix
+
+right_camera:
+  K2:  [996.14817, 0.0, 366.0459, 0.0, 1014.90382, 294.79982, 0.0, 0.0, 1.0]
+  D2:  [0.297923, 0.181784, 0.033351, 0.024461, 0.0]
+  R2:  [0.953934, 0.182186, -0.238365, -0.185852, 0.982551, 0.0072, 0.235517, 0.037432, 0.971149]
+  P2:  [1611.15619, 0.0, 681.92049, 247.09871, 0.0, 1611.15619, 284.17106, 0.0, 0.0, 0.0, 1.0, 0.0]
