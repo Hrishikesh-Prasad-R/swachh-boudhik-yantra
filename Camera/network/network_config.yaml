@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Swachh Boudhik Yantra — Network Transport Configuration
+# Used by: rpi_publisher.py  |  gpu_worker.py  |  benchmark.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+rpi:
+  host: "192.168.4.1"        # RPi fixed IP (as AP)
+  pub_port: 5555             # RPi publishes frames here  (ZMQ PUB)
+  pull_port: 5556            # RPi receives results here  (ZMQ PULL)
+
+gpu:
+  # Frame streaming settings
+  jpeg_quality: 75           # JPEG compression quality (0–100)
+                             # 75 = good balance: ~30KB/frame @ 640x480
+                             # Lower = smaller/faster, Higher = better quality
+  frame_skip: 1              # Send every Nth frame (1 = every frame, 2 = every other)
+  send_both_cameras: true    # Send both left + right frames for depth
+                             # Set false to send only left (no depth on GPU)
+
+  # Receiving results
+  recv_timeout_ms: 300       # Drop if no result received within this time
+
+zmq:
+  hwm: 2                     # High-water mark: drop old frames, don't queue
+                             # Keeps latency low under slow GPU conditions
+  linger_ms: 0               # Don't block on socket close
+  reconnect_ivl_ms: 500      # ZMQ auto-reconnect interval
+  reconnect_ivl_max_ms: 5000 # Max reconnect back-off
+
+# Bandwidth estimation:
+# 2 cameras × 640×480 JPEG @ quality=75 ≈ 30KB each = 60KB/frame
+# @ 10 FPS → ~600 KB/s = ~5 Mbps outgoing from RPi
+# Results back: tiny JSON (~200 bytes/frame) = negligible
+# WiFi 802.11n budget: ~50 Mbps — well within limits
