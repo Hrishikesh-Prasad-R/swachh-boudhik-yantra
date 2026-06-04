@@ -4,7 +4,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 rpi:
-  host: "192.168.4.1"        # RPi fixed IP (as AP)
+  host: "10.0.0.1"           # RPi fixed IP (Ethernet static)
   pub_port: 5555             # RPi publishes frames here  (ZMQ PUB)
   pull_port: 5556            # RPi receives results here  (ZMQ PULL)
 

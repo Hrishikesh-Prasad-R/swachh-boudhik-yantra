@@ -68,18 +68,20 @@ _pre_buf = np.empty((1, 3, IMG_SIZE, IMG_SIZE), dtype=np.float32)
 
 
 def _letterbox(img, size=IMG_SIZE):
-    h, w = img.shape[:2]
-    r    = min(size / h, size / w)
-    nw   = int(round(w * r))
-    nh   = int(round(h * r))
-    dw   = (size - nw) / 2
-    dh   = (size - nh) / 2
-    img  = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_LINEAR)
-    t, b = int(round(dh - 0.1)), int(round(dh + 0.1))
-    l, r = int(round(dw - 0.1)), int(round(dw + 0.1))
-    img  = cv2.copyMakeBorder(img, t, b, l, r,
-                               cv2.BORDER_CONSTANT, value=(114, 114, 114))
-    return img, r, (dw, dh)
+    h, w   = img.shape[:2]
+    ratio  = min(size / h, size / w)   # scale ratio
+    nw     = int(round(w * ratio))
+    nh     = int(round(h * ratio))
+    dw     = (size - nw) / 2
+    dh     = (size - nh) / 2
+    img    = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    pad_t  = int(round(dh - 0.1))
+    pad_b  = int(round(dh + 0.1))
+    pad_l  = int(round(dw - 0.1))
+    pad_r  = int(round(dw + 0.1))
+    img    = cv2.copyMakeBorder(img, pad_t, pad_b, pad_l, pad_r,
+                                cv2.BORDER_CONSTANT, value=(114, 114, 114))
+    return img, ratio, (dw, dh)
 
 
 def _preprocess(frame: np.ndarray, use_color: bool):
@@ -196,17 +198,31 @@ class Detector:
         -------
         List[Detection]  — sorted by confidence descending.
         """
+        # Guard: reject empty / corrupt frames (e.g. dropped JPEG over network)
+        if frame is None or frame.size == 0 or 0 in frame.shape:
+            log.warning("detect() received an empty/corrupt frame — skipping.")
+            return []
+
+        fh, fw = frame.shape[:2]
+
         tensor, ratio, pad = _preprocess(frame, self.use_color)
+
+        # Guard: ratio=0 would cause divide-by-zero → inf → OverflowError
+        if not np.isfinite(ratio) or ratio == 0.0:
+            log.warning(f"detect() got invalid scale ratio={ratio} — skipping frame.")
+            return []
+
         raw  = self._engine.infer(tensor)
         dets = _nms(raw, self.conf_thr, self.iou_thr, self.allowed_ids)
 
         results = []
         for x1, y1, x2, y2, conf, cid in dets:
             # Un-pad & un-scale back to original frame coordinates
-            x1u = max(0, int((x1 - pad[0]) / ratio))
-            y1u = max(0, int((y1 - pad[1]) / ratio))
-            x2u = max(0, int((x2 - pad[0]) / ratio))
-            y2u = max(0, int((y2 - pad[1]) / ratio))
+            # Use np.clip to keep coords finite before int-casting
+            x1u = int(np.clip((x1 - pad[0]) / ratio, 0, fw - 1))
+            y1u = int(np.clip((y1 - pad[1]) / ratio, 0, fh - 1))
+            x2u = int(np.clip((x2 - pad[0]) / ratio, 0, fw - 1))
+            y2u = int(np.clip((y2 - pad[1]) / ratio, 0, fh - 1))
             cid = int(cid)
             results.append(Detection(
                 x1=x1u, y1=y1u, x2=x2u, y2=y2u,

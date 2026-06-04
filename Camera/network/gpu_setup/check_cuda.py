@@ -110,7 +110,7 @@ def check_numpy():
         return False
 
 
-def check_network(rpi_host="192.168.4.1"):
+def check_network(rpi_host="10.0.0.1"):
     """Try to ping the RPi hotspot IP."""
     import subprocess, platform
     ping_cmd = ["ping", "-n", "3", rpi_host] if platform.system() == "Windows" \
@@ -128,7 +128,7 @@ def check_network(rpi_host="192.168.4.1"):
             return True
         else:
             print(f"  ✗ Cannot reach {rpi_host}")
-            print("    → Are you connected to WiFi 'swachh-bot'?")
+            print("    → Is the Ethernet cable connected? Check IP 10.0.0.2 on this PC.")
             return False
     except Exception as e:
         print(f"  ✗ Ping failed: {e}")
@@ -160,8 +160,8 @@ def main():
     all_ok &= check_opencv()
     all_ok &= check_numpy()
 
-    print("\n── Network (RPi Hotspot) ────────────────────────────────")
-    net_ok = check_network("192.168.4.1")
+    print("\n── Network (RPi Ethernet) ───────────────────────────────")
+    net_ok = check_network("10.0.0.1")
     # Network is tested separately — not blocking
 
     print()
@@ -173,7 +173,7 @@ def main():
     elif all_ok and not net_ok:
         print("╔══════════════════════════════════════════════════════╗")
         print("║   GPU/CUDA OK ✓  — Network NOT connected yet        ║")
-        print("║   Connect to WiFi 'swachh-bot' and re-run.          ║")
+        print("║   Check Ethernet cable / IP 10.0.0.2 and re-run.    ║")
         print("╚══════════════════════════════════════════════════════╝")
     else:
         print("╔══════════════════════════════════════════════════════╗")

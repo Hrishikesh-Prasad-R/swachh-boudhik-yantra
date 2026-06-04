@@ -1,0 +1,50 @@
+{
+  "timestamp_utc": "2026-06-04T11:40:10.472631",
+  "platform": "DESKTOP-SU3OTED",
+  "duration_s": 120.03,
+  "target_fps": 10.0,
+  "jpeg_quality": 75,
+  "frames_sent": 1157,
+  "frames_received": 1157,
+  "timeouts": 0,
+  "zmq_drops": 0,
+  "packet_delivery_ratio_pct": 100.0,
+  "effective_fps": 9.6389,
+  "round_trip_ms": {
+    "mean": "50.978",
+    "std": "4.637",
+    "min": "32.908",
+    "max": "92.396",
+    "p50": "50.585",
+    "p95": "56.964",
+    "p99": "61.085"
+  },
+  "inference_ms": {
+    "mean": "50.587",
+    "std": "3.685",
+    "min": "39.600",
+    "max": "89.200",
+    "p50": "51.000",
+    "p95": "54.200",
+    "p99": "58.352"
+  },
+  "one_way_latency_ms": {
+    "mean": "50.978",
+    "std": "4.637",
+    "min": "32.908",
+    "max": "92.396",
+    "p50": "50.585",
+    "p95": "56.964",
+    "p99": "61.085"
+  },
+  "bandwidth_mbps": {
+    "mean": "2.150",
+    "std": "0.027",
+    "min": "2.028",
+    "max": "2.216",
+    "p50": "2.155",
+    "p95": "2.183",
+    "p99": "2.196"
+  },
+  "csv_path": "C:\\Users\\BMSCECSE\\Desktop\\swachh-boudhik-yantra\\Camera\\network\\benchmark_20260604_170808.csv"
+}

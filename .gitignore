@@ -64,3 +64,5 @@ logs/
 # ── Misc ──────────────────────────────────────────────────────
 *.egg-info/
 dist/
+
+Camera/network/gpu_setup/swachh-gpu-env/
