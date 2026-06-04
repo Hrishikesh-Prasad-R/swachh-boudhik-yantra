@@ -77,7 +77,7 @@ class _CamThread:
 
 class StereoCam:
     """
-    Dual-camera stereo capture.
+    Dual-camera stereo capture with single-camera fallback.
 
     Parameters
     ----------
@@ -95,16 +95,19 @@ class StereoCam:
         right_id = cfg.get("right_device", 2)
 
         log.info(f"Opening LEFT camera  → /dev/video{left_id}")
-        log.info(f"Opening RIGHT camera → /dev/video{right_id}")
-
-        # Apply v4l2 settings before opening capture
         _apply_v4l2_settings(f"/dev/video{left_id}",  cfg)
-        _apply_v4l2_settings(f"/dev/video{right_id}", cfg)
+        self._left = _CamThread(left_id,  w, h, fps)
 
-        self._left  = _CamThread(left_id,  w, h, fps)
-        self._right = _CamThread(right_id, w, h, fps)
-
-        log.info("StereoCam ready.")
+        self._right = None
+        try:
+            log.info(f"Opening RIGHT camera → /dev/video{right_id}")
+            _apply_v4l2_settings(f"/dev/video{right_id}", cfg)
+            self._right = _CamThread(right_id, w, h, fps)
+            log.info("StereoCam ready (dual cameras).")
+        except Exception as e:
+            log.warning(f"Could not open right camera /dev/video{right_id}: {e}")
+            log.warning("Falling back to single camera mode (duplicating left frame).")
+            log.info("StereoCam ready (single camera fallback).")
 
     def read(self):
         """
@@ -113,8 +116,8 @@ class StereoCam:
         (left, right) : tuple[np.ndarray, np.ndarray] or (None, None)
             Frames in the configured color mode.
         """
-        left  = self._left.read()
-        right = self._right.read()
+        left = self._left.read()
+        right = self._right.read() if self._right is not None else left
 
         if left is None or right is None:
             return None, None
@@ -127,8 +130,8 @@ class StereoCam:
 
     def read_gray(self):
         """Always returns grayscale regardless of use_color setting (for depth)."""
-        left  = self._left.read()
-        right = self._right.read()
+        left = self._left.read()
+        right = self._right.read() if self._right is not None else left
         if left is None or right is None:
             return None, None
         return cv2.cvtColor(left,  cv2.COLOR_BGR2GRAY), \
@@ -136,5 +139,7 @@ class StereoCam:
 
     def release(self):
         self._left.release()
-        self._right.release()
+        if self._right is not None:
+            self._right.release()
         log.info("StereoCam released.")
+
