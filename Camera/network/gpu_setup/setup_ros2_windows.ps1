@@ -256,11 +256,11 @@ Write-Info "Cloning Navigation2, slam_toolbox, robot_localization..."
 Write-Info "This downloads ~500 MB of source code..."
 Push-Location "$ROS2_WS"
 try {
-    vcs import src < $reposFile 2>$null
+    Get-Content $reposFile | vcs import src 2>$null
     Write-Done "All repos cloned into $ROS2_WS\src"
 } catch {
     Write-Fail "vcs import failed: $_"
-    Write-Info "Try manually: cd $ROS2_WS && vcs import src < nav2.repos"
+    Write-Info "Try manually: cd $ROS2_WS; vcs import src --input nav2.repos"
 }
 Pop-Location
 
