@@ -3,7 +3,7 @@
 # Run as Administrator. Progress is logged to C:\dev\ros2_progress.json
 
 $ErrorActionPreference = "Continue"
-$ROS2_ZIP_URL = "https://github.com/ros2/ros2/releases/download/release-humble-20250415/ros2-humble-20250415-windows-release-amd64.zip"
+$ROS2_ZIP_URL = "https://github.com/ros2/ros2/releases/download/release-humble-20260220/ros2-humble-20260220-windows-release-amd64.zip"
 $ROS2_DIR     = "C:\dev\ros2_humble"
 $ROS2_WS      = "C:\dev\ros2_ws"
 $DOWNLOAD_DIR = "$env:TEMP\ros2_setup"
@@ -294,7 +294,7 @@ Set-Progress 5 "Nav2 Workspace" 1 6 "Create workspace dirs" "done"
 # 5.2 Write nav2.repos  (MUST be UTF-8 no-BOM + LF endings -- Python vcs rejects BOM)
 Set-Progress 5 "Nav2 Workspace" 2 6 "Write nav2.repos" "running"
 $reposFile = "$ROS2_WS\nav2.repos"
-$yamlContent = "repositories:`n  navigation2:`n    type: git`n    url: https://github.com/ros-navigation/navigation2.git`n    version: humble`n  slam_toolbox:`n    type: git`n    url: https://github.com/SteveMacenski/slam_toolbox.git`n    version: humble`n  robot_localization:`n    type: git`n    url: https://github.com/cra-ros-pkg/robot_localization.git`n    version: humble`n"
+$yamlContent = "repositories:`n  navigation2:`n    type: git`n    url: https://github.com/ros-navigation/navigation2.git`n    version: humble`n  slam_toolbox:`n    type: git`n    url: https://github.com/SteveMacenski/slam_toolbox.git`n    version: humble`n  robot_localization:`n    type: git`n    url: https://github.com/cra-ros-pkg/robot_localization.git`n    version: humble-devel`n"
 [System.IO.File]::WriteAllText($reposFile, $yamlContent, [System.Text.UTF8Encoding]::new($false))
 $bomCheck = [System.IO.File]::ReadAllBytes($reposFile)[0..2] | ForEach-Object { '{0:X2}' -f $_ }
 Write-Done "nav2.repos written (no BOM: $($bomCheck -join ' '))"
@@ -350,6 +350,36 @@ Write-Step "colcon build (15-45 min -- output streaming below)"
 Write-Info "Building Navigation2 from source. This is the longest step."
 $colconCmd = Get-Command colcon -ErrorAction SilentlyContinue
 if ($colconCmd) {
+    # Find vcvarsall.bat to initialize the VS C++ compiler environment
+    # (colcon/cmake require VisualStudioVersion env var to be set)
+    $vcvarsall = $null
+    $vsWherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWherePath) {
+        $vsInst = & $vsWherePath -latest -property installationPath 2>$null
+        if ($vsInst -and (Test-Path "$vsInst\VC\Auxiliary\Build\vcvarsall.bat")) {
+            $vcvarsall = "$vsInst\VC\Auxiliary\Build\vcvarsall.bat"
+        }
+    }
+    # Fallback: hardcode known BuildTools path
+    if (-not $vcvarsall) {
+        $fallback = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+        if (Test-Path $fallback) { $vcvarsall = $fallback }
+    }
+
+    if ($vcvarsall) {
+        Write-Info "Initializing VS C++ environment from: $vcvarsall"
+        # Source VS environment into current PowerShell session via cmd /c trick
+        $envOutput = cmd /c "`"$vcvarsall`" amd64 > nul 2>&1 && set" 2>$null
+        foreach ($line in $envOutput) {
+            if ($line -match '^([^=]+)=(.*)$') {
+                [System.Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+            }
+        }
+        Write-Done "VS C++ environment initialized (VisualStudioVersion=$env:VisualStudioVersion)"
+    } else {
+        Write-Fail "vcvarsall.bat not found -- colcon build may fail with VisualStudioVersion error"
+    }
+
     Push-Location "$ROS2_WS"
     if (Test-Path "$ROS2_DIR\local_setup.ps1") { . "$ROS2_DIR\local_setup.ps1" }
     colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object -FilePath "$ROS2_WS\build_log.txt"
