@@ -1,19 +1,36 @@
 # setup_ros2_windows.ps1 -- Swachh Boudhik Yantra
 # ROS 2 Humble + Navigation2 Full Setup for Windows 11 GPU System
-#
-# Run as Administrator in PowerShell:
-#   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-#   .\setup_ros2_windows.ps1
-#
-# Prerequisites: Internet connection (via RPi NAT forwarding or USB tether)
+# Run as Administrator. Progress is logged to C:\dev\ros2_progress.json
 
-$ErrorActionPreference = "Continue"   # Don't stop on non-fatal errors
-$ROS2_ZIP_URL  = "https://github.com/ros2/ros2/releases/download/release-humble-20250415/ros2-humble-20250415-windows-release-amd64.zip"
-$ROS2_DIR      = "C:\dev\ros2_humble"
-$ROS2_WS       = "C:\dev\ros2_ws"
-$DOWNLOAD_DIR  = "$env:TEMP\ros2_setup"
+$ErrorActionPreference = "Continue"
+$ROS2_ZIP_URL = "https://github.com/ros2/ros2/releases/download/release-humble-20250415/ros2-humble-20250415-windows-release-amd64.zip"
+$ROS2_DIR     = "C:\dev\ros2_humble"
+$ROS2_WS      = "C:\dev\ros2_ws"
+$DOWNLOAD_DIR = "$env:TEMP\ros2_setup"
+$PROGRESS_FILE = "C:\dev\ros2_progress.json"
 
-# -- Colour + Progress Helpers ------------------------------------------------
+New-Item -ItemType Directory -Force -Path "C:\dev" | Out-Null
+New-Item -ItemType Directory -Force -Path $DOWNLOAD_DIR | Out-Null
+
+# ── Progress helpers ──────────────────────────────────────────────────────────
+function Set-Progress {
+    param([int]$PhaseNum, [string]$PhaseName, [int]$TaskNum, [int]$TaskTotal,
+          [string]$TaskName, [string]$Status, [string]$Detail = "")
+    $pct = if ($TaskTotal -gt 0) { [math]::Round(($TaskNum / $TaskTotal) * 100) } else { 0 }
+    $obj = [ordered]@{
+        phase_num   = $PhaseNum
+        phase_name  = $PhaseName
+        task_num    = $TaskNum
+        task_total  = $TaskTotal
+        task_name   = $TaskName
+        status      = $Status   # running / done / fail / skip
+        pct         = $pct
+        detail      = $Detail
+        timestamp   = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    }
+    $obj | ConvertTo-Json -Compress | Out-File -FilePath $PROGRESS_FILE -Encoding utf8 -Force
+}
+
 function Write-Phase { param($num, $total, $msg)
     Write-Host ""
     Write-Host "=======================================================" -ForegroundColor DarkCyan
@@ -22,202 +39,253 @@ function Write-Phase { param($num, $total, $msg)
 }
 function Write-Step { param($msg) Write-Host "  [ ] $msg ..." -ForegroundColor White }
 function Write-Done { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
-function Write-Skip { param($msg) Write-Host "  [--] $msg (already installed)" -ForegroundColor Yellow }
+function Write-Skip { param($msg) Write-Host "  [--] $msg (already done)" -ForegroundColor Yellow }
 function Write-Fail { param($msg) Write-Host "  [!!] $msg" -ForegroundColor Red }
 function Write-Info { param($msg) Write-Host "  --> $msg" -ForegroundColor DarkGray }
 
-# -- Admin Check --------------------------------------------------------------
+# ── Admin check ───────────────────────────────────────────────────────────────
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
 if (-not $isAdmin) {
-    Write-Host "`n  ERROR: This script must be run as Administrator!" -ForegroundColor Red
-    Write-Host "  Right-click PowerShell -> Run as Administrator`n" -ForegroundColor Yellow
-    exit 1
+    Write-Host "`n  ERROR: Run as Administrator!" -ForegroundColor Red; exit 1
 }
 
-# -- Banner -------------------------------------------------------------------
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Magenta
 Write-Host "  Swachh Boudhik Yantra -- ROS 2 Humble + Nav2 Setup" -ForegroundColor Magenta
-Write-Host "  Target: Windows 11 / NVIDIA RTX A6000" -ForegroundColor Magenta
+Write-Host "  Progress file: $PROGRESS_FILE" -ForegroundColor DarkGray
+Write-Host "  Monitor with: .\monitor_ros2.ps1 (in any other terminal)" -ForegroundColor DarkGray
 Write-Host "============================================================" -ForegroundColor Magenta
 Write-Host ""
 
-$totalPhases = 6
-New-Item -ItemType Directory -Force -Path $DOWNLOAD_DIR | Out-Null
-
 # =============================================================================
-# PHASE 1: Chocolatey
+# PHASE 1 -- Chocolatey  (1 task)
 # =============================================================================
-Write-Phase 1 $totalPhases "Chocolatey Package Manager"
+Write-Phase 1 6 "Chocolatey Package Manager"
+Set-Progress 1 "Chocolatey" 0 1 "Install Chocolatey" "running"
 
-Write-Step "Checking Chocolatey"
+Write-Step "Chocolatey"
 $chocoCmd = Get-Command choco -ErrorAction SilentlyContinue
 if ($chocoCmd) {
-    Write-Skip "Chocolatey $( choco --version )"
+    Write-Skip "Chocolatey $(choco --version)"
+    Set-Progress 1 "Chocolatey" 1 1 "Chocolatey" "skip" "v$(choco --version)"
 } else {
     Write-Info "Installing Chocolatey..."
     Set-ExecutionPolicy Bypass -Scope Process -Force
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    Write-Done "Chocolatey installed"
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Done "Chocolatey installed"
+        Set-Progress 1 "Chocolatey" 1 1 "Chocolatey" "done" "v$(choco --version)"
+    } else {
+        Write-Fail "Chocolatey install failed"
+        Set-Progress 1 "Chocolatey" 1 1 "Chocolatey" "fail"
+    }
 }
 
 # =============================================================================
-# PHASE 2: System Prerequisites
+# PHASE 2 -- System Prerequisites  (7 tasks)
 # =============================================================================
-Write-Phase 2 $totalPhases "System Prerequisites (via Chocolatey)"
+Write-Phase 2 6 "System Prerequisites"
 
 $chocoPackages = @(
-    @{Name="cmake";       DisplayName="CMake (Build System)"},
-    @{Name="git";         DisplayName="Git"},
-    @{Name="openssl";     DisplayName="OpenSSL (DDS Security)"},
-    @{Name="vcredist140"; DisplayName="Visual C++ Redistributable 2015-2022"},
-    @{Name="graphviz";    DisplayName="Graphviz (rqt graph tools)"},
-    @{Name="wget";        DisplayName="wget (download utility)"}
+    @{Name="cmake";       Display="CMake"},
+    @{Name="git";         Display="Git"},
+    @{Name="openssl";     Display="OpenSSL"},
+    @{Name="vcredist140"; Display="VC++ Redistributable"},
+    @{Name="graphviz";    Display="Graphviz"},
+    @{Name="wget";        Display="wget"}
 )
+
+$p2total = 7   # 6 choco + VS Build Tools
+$p2i = 0
 
 foreach ($pkg in $chocoPackages) {
-    Write-Step $pkg.DisplayName
+    $p2i++
+    Set-Progress 2 "Prerequisites" $p2i $p2total $pkg.Display "running"
+    Write-Step $pkg.Display
     $installed = choco list --local-only --exact $pkg.Name 2>$null | Select-String $pkg.Name
     if ($installed) {
-        Write-Skip $pkg.DisplayName
+        Write-Skip $pkg.Display
+        Set-Progress 2 "Prerequisites" $p2i $p2total $pkg.Display "skip"
     } else {
         choco install $pkg.Name -y --no-progress 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { Write-Done $pkg.DisplayName }
-        else { Write-Fail "$($pkg.DisplayName) -- install failed (non-fatal, continuing)" }
+        if ($LASTEXITCODE -eq 0) {
+            Write-Done $pkg.Display
+            Set-Progress 2 "Prerequisites" $p2i $p2total $pkg.Display "done"
+        } else {
+            Write-Fail "$($pkg.Display) failed (non-fatal)"
+            Set-Progress 2 "Prerequisites" $p2i $p2total $pkg.Display "fail"
+        }
     }
 }
 
-# -- Visual Studio Build Tools ------------------------------------------------
-Write-Step "Visual Studio Build Tools 2022 (C++ workload)"
+# VS Build Tools
+$p2i++
+Set-Progress 2 "Prerequisites" $p2i $p2total "VS Build Tools 2022" "running" "checking..."
+Write-Step "VS Build Tools 2022"
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$vsInstalled = $false
-if (Test-Path $vsWhere) {
-    $vsPath = & $vsWhere -latest -property installationPath 2>$null
-    if ($vsPath) { $vsInstalled = $true }
-}
+$vsInstalled = (Test-Path $vsWhere) -and (& $vsWhere -latest -property installationPath 2>$null)
 if ($vsInstalled) {
-    Write-Skip "Visual Studio Build Tools"
+    Write-Skip "VS Build Tools"
+    Set-Progress 2 "Prerequisites" $p2i $p2total "VS Build Tools 2022" "skip"
 } else {
-    Write-Info "Installing VS Build Tools 2022 with C++ workload (5-10 min)..."
+    Write-Info "Installing VS Build Tools 2022 (5-10 min)..."
+    Set-Progress 2 "Prerequisites" $p2i $p2total "VS Build Tools 2022" "running" "installing C++ workload (5-10 min)..."
     choco install visualstudio2022buildtools -y --no-progress --params "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { Write-Done "Visual Studio Build Tools 2022" }
-    else { Write-Fail "VS Build Tools -- install manually from https://visualstudio.microsoft.com/downloads/" }
+    if ($LASTEXITCODE -eq 0) {
+        Write-Done "VS Build Tools 2022"
+        Set-Progress 2 "Prerequisites" $p2i $p2total "VS Build Tools 2022" "done"
+    } else {
+        Write-Fail "VS Build Tools failed"
+        Set-Progress 2 "Prerequisites" $p2i $p2total "VS Build Tools 2022" "fail"
+    }
 }
 
-# -- Qt5 for RViz2 (FIXED: was Test-Path "C:\Qt" -or ...) --------------------
-Write-Step "Qt5 (for RViz2 visualization)"
-$qt5Exists = (Test-Path "C:\Qt") -or ($null -ne (Get-ChildItem "C:\Qt" -Filter "5*" -ErrorAction SilentlyContinue))
-if ($qt5Exists) {
+# Qt5 (optional, non-fatal)
+Write-Step "Qt5 (optional, for RViz2)"
+$qt5ok = Test-Path "C:\Qt"
+if ($qt5ok) {
     Write-Skip "Qt5"
 } else {
-    Write-Info "Attempting Qt5 via choco (may fail -- that is OK, RViz2 optional)"
     choco install qt5-default -y --no-progress 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { Write-Done "Qt5" }
-    else { Write-Fail "Qt5 not installed -- RViz2 GUI will not work, rest of ROS 2 is fine" }
+    if ($LASTEXITCODE -eq 0) { Write-Done "Qt5" } else { Write-Fail "Qt5 not available via choco (optional -- skipping)" }
 }
 
-# Refresh PATH after all choco installs
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+Set-Progress 2 "Prerequisites" 7 7 "All prerequisites" "done"
 
 # =============================================================================
-# PHASE 3: ROS 2 Humble Core
+# PHASE 3 -- ROS 2 Humble  (3 tasks: download, extract, source)
 # =============================================================================
-Write-Phase 3 $totalPhases "ROS 2 Humble Desktop (Binary Release)"
+Write-Phase 3 6 "ROS 2 Humble Desktop (Binary)"
 
-Write-Step "Checking existing ROS 2 installation"
 if (Test-Path "$ROS2_DIR\local_setup.ps1") {
-    Write-Skip "ROS 2 Humble already at $ROS2_DIR"
+    Write-Skip "ROS 2 Humble (already at $ROS2_DIR)"
+    Set-Progress 3 "ROS 2 Humble" 3 3 "Already installed" "skip"
 } else {
-    Write-Host ""
     $zipPath = "$DOWNLOAD_DIR\ros2-humble-windows.zip"
 
+    # Task 3.1 -- Download
+    Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading zip (~1.5 GB)" "running" "starting download..."
     if (Test-Path $zipPath) {
-        Write-Info "Using cached download: $zipPath"
+        $cachedMB = [math]::Round((Get-Item $zipPath).Length/1MB)
+        Write-Info "Using cached zip ($cachedMB MB)"
+        Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading zip" "skip" "cached ($cachedMB MB)"
     } else {
-        Write-Info "Downloading ROS 2 Humble (~1.5 GB) -- this takes 10-30 min depending on speed..."
+        Write-Info "Downloading ROS 2 Humble (~1.5 GB) -- see monitor for progress..."
         Write-Info "URL: $ROS2_ZIP_URL"
-        try {
+
+        # Background download job so we can update progress file while it downloads
+        $job = Start-Job -ScriptBlock {
+            param($url, $dest)
             $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri $ROS2_ZIP_URL -OutFile $zipPath -UseBasicParsing
-            $ProgressPreference = 'Continue'
-            $sizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB)
-            Write-Done "Download complete ($sizeMB MB)"
-        } catch {
-            Write-Fail "Download failed: $_"
-            Write-Info "Manual download URL: $ROS2_ZIP_URL"
-            Write-Info "Save to: $zipPath"
-            Write-Info "Then re-run this script to continue from extraction."
+            Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+        } -ArgumentList $ROS2_ZIP_URL, $zipPath
+
+        $startTime = Get-Date
+        while ($job.State -eq 'Running') {
+            Start-Sleep -Seconds 3
+            if (Test-Path $zipPath) {
+                $dlMB    = [math]::Round((Get-Item $zipPath).Length / 1MB)
+                $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds)
+                $detail  = "${dlMB} MB downloaded (${elapsed}s elapsed)"
+                Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading zip (~1500 MB)" "running" $detail
+                Write-Host "  --> $detail" -ForegroundColor DarkGray
+            }
+        }
+        Receive-Job $job -ErrorAction SilentlyContinue | Out-Null
+        Remove-Job $job
+
+        if (Test-Path $zipPath) {
+            $finalMB = [math]::Round((Get-Item $zipPath).Length / 1MB)
+            Write-Done "Download complete ($finalMB MB)"
+            Set-Progress 3 "ROS 2 Humble" 1 3 "Download complete" "done" "$finalMB MB"
+        } else {
+            Write-Fail "Download failed -- retry or download manually to: $zipPath"
+            Set-Progress 3 "ROS 2 Humble" 1 3 "Download" "fail" "failed"
         }
     }
 
+    # Task 3.2 -- Extract
     if (Test-Path $zipPath) {
-        Write-Step "Extracting ROS 2 to $ROS2_DIR"
-        Write-Info "Extracting (2-5 minutes)..."
+        Set-Progress 3 "ROS 2 Humble" 2 3 "Extracting zip (2-5 min)" "running"
+        Write-Step "Extracting to $ROS2_DIR"
+        Write-Info "This takes 2-5 minutes..."
         New-Item -ItemType Directory -Force -Path $ROS2_DIR | Out-Null
         Expand-Archive -Path $zipPath -DestinationPath "C:\dev" -Force
-
-        # The zip extracts to ros2-windows subfolder -- move if needed
-        $extractedDir = "C:\dev\ros2-windows"
-        if (Test-Path $extractedDir) {
-            Move-Item -Path "$extractedDir\*" -Destination $ROS2_DIR -Force -ErrorAction SilentlyContinue
-            Remove-Item $extractedDir -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path "C:\dev\ros2-windows") {
+            Move-Item -Path "C:\dev\ros2-windows\*" -Destination $ROS2_DIR -Force -ErrorAction SilentlyContinue
+            Remove-Item "C:\dev\ros2-windows" -Recurse -Force -ErrorAction SilentlyContinue
         }
-        Write-Done "ROS 2 Humble extracted to $ROS2_DIR"
+        Write-Done "Extracted to $ROS2_DIR"
+        Set-Progress 3 "ROS 2 Humble" 2 3 "Extraction" "done"
+    }
+
+    # Task 3.3 -- Source
+    Set-Progress 3 "ROS 2 Humble" 3 3 "Sourcing environment" "running"
+    if (Test-Path "$ROS2_DIR\local_setup.ps1") {
+        . "$ROS2_DIR\local_setup.ps1"
+        Write-Done "ROS 2 environment sourced"
+        Set-Progress 3 "ROS 2 Humble" 3 3 "Environment sourced" "done"
+    } else {
+        Write-Fail "local_setup.ps1 not found -- extraction may have failed"
+        Set-Progress 3 "ROS 2 Humble" 3 3 "Source env" "fail"
     }
 }
 
-# Source ROS 2 environment
-Write-Step "Sourcing ROS 2 environment"
-if (Test-Path "$ROS2_DIR\local_setup.ps1") {
-    . "$ROS2_DIR\local_setup.ps1"
-    Write-Done "ROS 2 environment sourced"
-} else {
-    Write-Fail "local_setup.ps1 not found -- Phase 3 download/extract may have failed"
-}
-
 # =============================================================================
-# PHASE 4: Python ROS 2 Tools (pip)
+# PHASE 4 -- Python pip tools  (8 tasks)
 # =============================================================================
-Write-Phase 4 $totalPhases "Python ROS 2 Tools (pip)"
+Write-Phase 4 6 "Python ROS 2 Tools (pip)"
 
-$pipPackages = @(
-    @{Name="colcon-common-extensions"; DisplayName="colcon (ROS 2 build tool)"},
-    @{Name="rosdep";                   DisplayName="rosdep (dependency resolver)"},
-    @{Name="vcstool";                  DisplayName="vcstool (multi-repo VCS)"},
-    @{Name="lark";                     DisplayName="lark (launch file parser)"},
-    @{Name="transforms3d";             DisplayName="transforms3d (TF2 math)"},
-    @{Name="netifaces";                DisplayName="netifaces (network interfaces)"},
-    @{Name="catkin_pkg";               DisplayName="catkin_pkg (package metadata)"},
-    @{Name="empy";                     DisplayName="empy (template engine)"}
+$pipPkgs = @(
+    @{Name="colcon-common-extensions"; Display="colcon"},
+    @{Name="rosdep";                   Display="rosdep"},
+    @{Name="vcstool";                  Display="vcstool"},
+    @{Name="lark";                     Display="lark"},
+    @{Name="transforms3d";             Display="transforms3d"},
+    @{Name="netifaces";                Display="netifaces"},
+    @{Name="catkin_pkg";               Display="catkin_pkg"},
+    @{Name="empy";                     Display="empy"}
 )
 
-foreach ($pkg in $pipPackages) {
-    Write-Step $pkg.DisplayName
-    $check = pip show $pkg.Name 2>$null
-    if ($check) {
-        Write-Skip $pkg.DisplayName
+$p4i = 0
+foreach ($pkg in $pipPkgs) {
+    $p4i++
+    Set-Progress 4 "pip packages" $p4i $pipPkgs.Count $pkg.Display "running"
+    Write-Step $pkg.Display
+    if (pip show $pkg.Name 2>$null) {
+        Write-Skip $pkg.Display
+        Set-Progress 4 "pip packages" $p4i $pipPkgs.Count $pkg.Display "skip"
     } else {
         pip install $pkg.Name --quiet 2>$null
-        if ($LASTEXITCODE -eq 0) { Write-Done $pkg.DisplayName }
-        else { Write-Fail "$($pkg.DisplayName) -- pip install failed" }
+        if ($LASTEXITCODE -eq 0) {
+            Write-Done $pkg.Display
+            Set-Progress 4 "pip packages" $p4i $pipPkgs.Count $pkg.Display "done"
+        } else {
+            Write-Fail "$($pkg.Display) failed"
+            Set-Progress 4 "pip packages" $p4i $pipPkgs.Count $pkg.Display "fail"
+        }
     }
 }
 
 # =============================================================================
-# PHASE 5: Navigation2 Workspace
+# PHASE 5 -- Navigation2 Workspace  (6 tasks)
 # =============================================================================
-Write-Phase 5 $totalPhases "Navigation2 Workspace Setup"
+Write-Phase 5 6 "Navigation2 Workspace"
 
-Write-Step "Creating ROS 2 workspace at $ROS2_WS"
+# 5.1 Create workspace
+Set-Progress 5 "Nav2 Workspace" 1 6 "Create workspace dirs" "running"
+Write-Step "Creating workspace at $ROS2_WS"
 New-Item -ItemType Directory -Force -Path "$ROS2_WS\src" | Out-Null
-Write-Done "Workspace directory created"
+Write-Done "Workspace created"
+Set-Progress 5 "Nav2 Workspace" 1 6 "Create workspace dirs" "done"
 
-# Write nav2.repos file
+# 5.2 Write nav2.repos
+Set-Progress 5 "Nav2 Workspace" 2 6 "Write nav2.repos" "running"
 $reposFile = "$ROS2_WS\nav2.repos"
-Write-Step "Creating nav2.repos manifest"
-$reposLines = @(
+@(
     "repositories:",
     "  navigation2:",
     "    type: git",
@@ -231,128 +299,125 @@ $reposLines = @(
     "    type: git",
     "    url: https://github.com/cra-ros-pkg/robot_localization.git",
     "    version: humble"
-)
-$reposLines | Out-File -FilePath $reposFile -Encoding utf8
-Write-Done "nav2.repos created at $reposFile"
+) | Out-File -FilePath $reposFile -Encoding utf8
+Write-Done "nav2.repos written"
+Set-Progress 5 "Nav2 Workspace" 2 6 "Write nav2.repos" "done"
 
-# Clone repos via vcs
-Write-Step "Cloning Nav2 + SLAM + Localization repos (~500 MB)"
-Write-Info "This may take 5-15 minutes depending on internet speed..."
+# 5.3 vcs import
+Set-Progress 5 "Nav2 Workspace" 3 6 "Clone repos (nav2+slam+localization)" "running" "~500 MB, 5-15 min..."
+Write-Step "Cloning repos (~500 MB, 5-15 min)"
 $vcscmd = Get-Command vcs -ErrorAction SilentlyContinue
 if ($vcscmd) {
     Push-Location "$ROS2_WS"
     vcs import src --input $reposFile 2>&1
-    if ($LASTEXITCODE -eq 0) { Write-Done "All repos cloned" }
-    else { Write-Fail "vcs import had errors -- check output above" }
+    $vcsOk = $LASTEXITCODE -eq 0
     Pop-Location
+    if ($vcsOk) {
+        Write-Done "All repos cloned"
+        Set-Progress 5 "Nav2 Workspace" 3 6 "Clone repos" "done"
+    } else {
+        Write-Fail "vcs import had errors"
+        Set-Progress 5 "Nav2 Workspace" 3 6 "Clone repos" "fail"
+    }
 } else {
-    Write-Fail "vcs not found -- run: pip install vcstool   then re-run this script"
+    Write-Fail "vcs not found -- install vcstool first"
+    Set-Progress 5 "Nav2 Workspace" 3 6 "Clone repos" "fail" "vcstool missing"
 }
 
-# rosdep init + update
-Write-Step "Initializing rosdep"
-$rosdepCache = "$env:USERPROFILE\.ros\rosdep\sources.list.d"
-if (Test-Path $rosdepCache) {
+# 5.4 rosdep init
+Set-Progress 5 "Nav2 Workspace" 4 6 "rosdep init" "running"
+Write-Step "rosdep init"
+if (Test-Path "$env:USERPROFILE\.ros\rosdep") {
     Write-Skip "rosdep already initialized"
+    Set-Progress 5 "Nav2 Workspace" 4 6 "rosdep init" "skip"
 } else {
     rosdep init 2>&1
-    if ($LASTEXITCODE -eq 0) { Write-Done "rosdep initialized" }
-    else { Write-Fail "rosdep init failed -- try: rosdep init  manually" }
+    if ($LASTEXITCODE -eq 0) {
+        Write-Done "rosdep initialized"
+        Set-Progress 5 "Nav2 Workspace" 4 6 "rosdep init" "done"
+    } else {
+        Write-Fail "rosdep init failed (non-fatal)"
+        Set-Progress 5 "Nav2 Workspace" 4 6 "rosdep init" "fail"
+    }
 }
 
-Write-Step "Updating rosdep database"
+# 5.5 rosdep update
+Set-Progress 5 "Nav2 Workspace" 5 6 "rosdep update" "running"
+Write-Step "rosdep update"
 rosdep update 2>&1
-if ($LASTEXITCODE -eq 0) { Write-Done "rosdep database updated" }
-else { Write-Fail "rosdep update failed -- run: rosdep update  manually" }
+Set-Progress 5 "Nav2 Workspace" 5 6 "rosdep update" "done"
 
-# Install Nav2 dependencies via rosdep
-Write-Step "Installing Nav2 dependencies via rosdep"
-Push-Location "$ROS2_WS"
-rosdep install --from-paths src --ignore-src -r -y 2>&1
-Write-Info "rosdep finished (some Windows failures are expected and non-fatal)"
-Pop-Location
-
-# Build Nav2 workspace with colcon
-Write-Step "Building Nav2 workspace with colcon (15-45 min)"
-Write-Info "This is the longest step -- output will stream below..."
+# 5.6 colcon build
+Set-Progress 5 "Nav2 Workspace" 6 6 "colcon build (15-45 min)" "running" "compiling Nav2 C++ from source..."
+Write-Step "colcon build (15-45 min -- output streaming below)"
+Write-Info "Building Navigation2 from source. This is the longest step."
 $colconCmd = Get-Command colcon -ErrorAction SilentlyContinue
 if ($colconCmd) {
     Push-Location "$ROS2_WS"
-    $buildLog = "$ROS2_WS\build_log.txt"
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object -FilePath $buildLog
-    if ($LASTEXITCODE -eq 0) { Write-Done "Nav2 workspace built successfully" }
-    else {
-        Write-Fail "Build had errors -- see $buildLog"
-        Write-Info "Tip: re-run colcon build to continue from where it stopped"
+    if (Test-Path "$ROS2_DIR\local_setup.ps1") { . "$ROS2_DIR\local_setup.ps1" }
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release 2>&1 | Tee-Object -FilePath "$ROS2_WS\build_log.txt"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Done "Nav2 built successfully"
+        Set-Progress 5 "Nav2 Workspace" 6 6 "colcon build" "done"
+    } else {
+        Write-Fail "Build errors -- see $ROS2_WS\build_log.txt"
+        Set-Progress 5 "Nav2 Workspace" 6 6 "colcon build" "fail" "see build_log.txt"
     }
     Pop-Location
 } else {
-    Write-Fail "colcon not found -- install with: pip install colcon-common-extensions"
+    Write-Fail "colcon not found"
+    Set-Progress 5 "Nav2 Workspace" 6 6 "colcon build" "fail" "colcon missing"
 }
 
 # =============================================================================
-# PHASE 6: Verification
+# PHASE 6 -- Verification  (3 tasks)
 # =============================================================================
-Write-Phase 6 $totalPhases "Verification"
+Write-Phase 6 6 "Verification"
 
-# Source environments
-if (Test-Path "$ROS2_DIR\local_setup.ps1")          { . "$ROS2_DIR\local_setup.ps1" }
-if (Test-Path "$ROS2_WS\install\local_setup.ps1")   { . "$ROS2_WS\install\local_setup.ps1" }
+if (Test-Path "$ROS2_DIR\local_setup.ps1")        { . "$ROS2_DIR\local_setup.ps1" }
+if (Test-Path "$ROS2_WS\install\local_setup.ps1") { . "$ROS2_WS\install\local_setup.ps1" }
 
-$checks = @(
-    @{ Desc="ROS 2 CLI version";     Cmd={ ros2 --version 2>$null } },
-    @{ Desc="rclpy Python bindings"; Cmd={ python -c "import rclpy; print('rclpy OK')" 2>$null } },
-    @{ Desc="Nav2 packages present"; Cmd={ ros2 pkg list 2>$null | Select-String "nav2" } }
+$ver_tasks = @(
+    @{ Desc="ros2 CLI";          Cmd={ ros2 --version 2>$null } },
+    @{ Desc="rclpy bindings";    Cmd={ python -c "import rclpy; print('OK')" 2>$null } },
+    @{ Desc="Nav2 packages";     Cmd={ ros2 pkg list 2>$null | Select-String "nav2_bringup" } }
 )
-
-foreach ($chk in $checks) {
-    Write-Step $chk.Desc
+$v = 0
+foreach ($t in $ver_tasks) {
+    $v++
+    Set-Progress 6 "Verification" $v 3 $t.Desc "running"
+    Write-Step $t.Desc
     try {
-        $out = & $chk.Cmd
-        if ($out) { Write-Done "$($chk.Desc): $out" }
-        else      { Write-Fail "$($chk.Desc): no output (may need ROS 2 sourced)" }
+        $out = & $t.Cmd
+        if ($out) {
+            Write-Done "$($t.Desc): $out"
+            Set-Progress 6 "Verification" $v 3 $t.Desc "done" "$out"
+        } else {
+            Write-Fail "$($t.Desc): no output"
+            Set-Progress 6 "Verification" $v 3 $t.Desc "fail"
+        }
     } catch {
-        Write-Fail "$($chk.Desc): $_"
+        Write-Fail "$($t.Desc): $_"
+        Set-Progress 6 "Verification" $v 3 $t.Desc "fail"
     }
 }
 
-# =============================================================================
-# FINAL SUMMARY
-# =============================================================================
-Write-Host ""
-Write-Host "============================================================" -ForegroundColor Green
-Write-Host "  ROS 2 Humble + Nav2 Setup Complete!" -ForegroundColor Green
-Write-Host "" -ForegroundColor Green
-Write-Host "  Installed to:" -ForegroundColor Green
-Write-Host "    ROS 2 Core : $ROS2_DIR" -ForegroundColor Green
-Write-Host "    Nav2 WS    : $ROS2_WS" -ForegroundColor Green
-Write-Host "" -ForegroundColor Green
-Write-Host "  To use ROS 2 in any new PowerShell window:" -ForegroundColor Green
-Write-Host "    . C:\dev\ros2_humble\local_setup.ps1" -ForegroundColor Green
-Write-Host "    . C:\dev\ros2_ws\install\local_setup.ps1" -ForegroundColor Green
-Write-Host "" -ForegroundColor Green
-Write-Host "  Quick test:" -ForegroundColor Green
-Write-Host "    ros2 run demo_nodes_cpp talker" -ForegroundColor Green
-Write-Host "    ros2 run demo_nodes_py listener  (in 2nd terminal)" -ForegroundColor Green
-Write-Host "============================================================" -ForegroundColor Green
-Write-Host ""
+Set-Progress 6 "Verification" 3 3 "ALL DONE" "done" "ROS2 Humble + Nav2 ready!"
 
-# Create convenience loader script
-$loaderPath = "C:\dev\source_ros2.ps1"
-New-Item -ItemType Directory -Force -Path "C:\dev" | Out-Null
-$loaderLines = @(
-    "# source_ros2.ps1 -- Run this at the start of every ROS 2 session",
-    "# Usage: . C:\dev\source_ros2.ps1",
-    "",
-    "Write-Host 'Loading ROS 2 Humble environment...' -ForegroundColor Cyan",
-    ". C:\dev\ros2_humble\local_setup.ps1",
-    "if (Test-Path 'C:\dev\ros2_ws\install\local_setup.ps1') {",
-    "    . C:\dev\ros2_ws\install\local_setup.ps1",
-    "    Write-Host 'Nav2 workspace loaded.' -ForegroundColor Green",
-    "}",
-    "Write-Host 'ROS 2 ready. Try: ros2 topic list' -ForegroundColor Green"
-)
-$loaderLines | Out-File -FilePath $loaderPath -Encoding utf8
-Write-Info "Created environment loader: $loaderPath"
-Write-Info "Run '. C:\dev\source_ros2.ps1' in every new terminal."
 Write-Host ""
+Write-Host "============================================================" -ForegroundColor Green
+Write-Host "  Setup Complete!" -ForegroundColor Green
+Write-Host "  ROS 2 Core : $ROS2_DIR" -ForegroundColor Green
+Write-Host "  Nav2 WS    : $ROS2_WS" -ForegroundColor Green
+Write-Host "  Source env : . C:\dev\source_ros2.ps1" -ForegroundColor Green
+Write-Host "============================================================" -ForegroundColor Green
+
+# Write convenience loader
+@(
+    "# source_ros2.ps1",
+    "Write-Host 'Loading ROS 2...' -ForegroundColor Cyan",
+    ". C:\dev\ros2_humble\local_setup.ps1",
+    "if (Test-Path 'C:\dev\ros2_ws\install\local_setup.ps1') { . C:\dev\ros2_ws\install\local_setup.ps1 }",
+    "Write-Host 'Ready. Try: ros2 topic list' -ForegroundColor Green"
+) | Out-File -FilePath "C:\dev\source_ros2.ps1" -Encoding utf8
+Write-Info "Loader saved: C:\dev\source_ros2.ps1"
