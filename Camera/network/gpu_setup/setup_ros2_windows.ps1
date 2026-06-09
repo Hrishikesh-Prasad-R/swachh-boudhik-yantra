@@ -3,7 +3,7 @@
 # Run as Administrator. Progress is logged to C:\dev\ros2_progress.json
 
 $ErrorActionPreference = "Continue"
-$ROS2_ZIP_URL = "https://github.com/ros2/ros2/releases/download/release-humble-20260220/ros2-humble-20260220-windows-release-amd64.zip"
+$ROS2_ZIP_URL = "https://github.com/ros2/ros2/releases/download/release-humble-20240222/ros2-humble-20240222-windows-release-amd64.zip"
 $ROS2_DIR     = "C:\dev\ros2_humble"
 $ROS2_WS      = "C:\dev\ros2_ws"
 $DOWNLOAD_DIR = "$env:TEMP\ros2_setup"
@@ -12,7 +12,7 @@ $PROGRESS_FILE = "C:\dev\ros2_progress.json"
 New-Item -ItemType Directory -Force -Path "C:\dev" | Out-Null
 New-Item -ItemType Directory -Force -Path $DOWNLOAD_DIR | Out-Null
 
-# ── Progress helpers ──────────────────────────────────────────────────────────
+# â”€â”€ Progress helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Set-Progress {
     param([int]$PhaseNum, [string]$PhaseName, [int]$TaskNum, [int]$TaskTotal,
           [string]$TaskName, [string]$Status, [string]$Detail = "")
@@ -43,7 +43,7 @@ function Write-Skip { param($msg) Write-Host "  [--] $msg (already done)" -Foreg
 function Write-Fail { param($msg) Write-Host "  [!!] $msg" -ForegroundColor Red }
 function Write-Info { param($msg) Write-Host "  --> $msg" -ForegroundColor DarkGray }
 
-# ── Admin check ───────────────────────────────────────────────────────────────
+# â”€â”€ Admin check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
 if (-not $isAdmin) {
     Write-Host "`n  ERROR: Run as Administrator!" -ForegroundColor Red; exit 1
