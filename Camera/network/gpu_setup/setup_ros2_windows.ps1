@@ -173,37 +173,46 @@ if (Test-Path "$ROS2_DIR\local_setup.ps1") {
         Write-Info "Using cached zip ($cachedMB MB)"
         Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading zip" "skip" "cached ($cachedMB MB)"
     } else {
-        Write-Info "Downloading ROS 2 Humble (~1.5 GB) -- see monitor for progress..."
+        Write-Info "Downloading ROS 2 Humble (~1.5 GB) via BITS -- this shows real-time progress..."
         Write-Info "URL: $ROS2_ZIP_URL"
 
-        # Background download job so we can update progress file while it downloads
-        $job = Start-Job -ScriptBlock {
-            param($url, $dest)
-            $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
-        } -ArgumentList $ROS2_ZIP_URL, $zipPath
-
-        $startTime = Get-Date
-        while ($job.State -eq 'Running') {
-            Start-Sleep -Seconds 3
-            if (Test-Path $zipPath) {
-                $dlMB    = [math]::Round((Get-Item $zipPath).Length / 1MB)
+        # Use Windows BITS (Background Intelligent Transfer Service) -- handles large files, resumes on failure
+        try {
+            $bitsJob = Start-BitsTransfer -Source $ROS2_ZIP_URL -Destination $zipPath -Asynchronous -DisplayName "ROS2 Humble Download"
+            $startTime = Get-Date
+            while ($bitsJob.JobState -notin @('Transferred','Error','TransientError')) {
+                Start-Sleep -Seconds 4
+                $mbDone  = [math]::Round($bitsJob.BytesTransferred / 1MB)
+                $mbTotal = if ($bitsJob.BytesTotal -gt 0) { [math]::Round($bitsJob.BytesTotal / 1MB) } else { 1500 }
+                $pct     = if ($mbTotal -gt 0) { [math]::Round($mbDone / $mbTotal * 100) } else { 0 }
                 $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds)
-                $detail  = "${dlMB} MB downloaded (${elapsed}s elapsed)"
+                $detail  = "${mbDone}/${mbTotal} MB  ${pct}%  (${elapsed}s)"
                 Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading zip (~1500 MB)" "running" $detail
                 Write-Host "  --> $detail" -ForegroundColor DarkGray
             }
-        }
-        Receive-Job $job -ErrorAction SilentlyContinue | Out-Null
-        Remove-Job $job
-
-        if (Test-Path $zipPath) {
-            $finalMB = [math]::Round((Get-Item $zipPath).Length / 1MB)
-            Write-Done "Download complete ($finalMB MB)"
-            Set-Progress 3 "ROS 2 Humble" 1 3 "Download complete" "done" "$finalMB MB"
-        } else {
-            Write-Fail "Download failed -- retry or download manually to: $zipPath"
-            Set-Progress 3 "ROS 2 Humble" 1 3 "Download" "fail" "failed"
+            if ($bitsJob.JobState -eq 'Transferred') {
+                Complete-BitsTransfer -BitsJob $bitsJob
+                $finalMB = [math]::Round((Get-Item $zipPath).Length / 1MB)
+                Write-Done "Download complete ($finalMB MB)"
+                Set-Progress 3 "ROS 2 Humble" 1 3 "Download complete" "done" "$finalMB MB"
+            } else {
+                Remove-BitsTransfer -BitsJob $bitsJob
+                throw "BITS job state: $($bitsJob.JobState)"
+            }
+        } catch {
+            Write-Fail "BITS download failed: $_ -- trying direct download as fallback..."
+            Set-Progress 3 "ROS 2 Humble" 1 3 "Downloading (fallback)" "running" "using Invoke-WebRequest..."
+            try {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri $ROS2_ZIP_URL -OutFile $zipPath -UseBasicParsing
+                $ProgressPreference = 'Continue'
+                $finalMB = [math]::Round((Get-Item $zipPath).Length / 1MB)
+                Write-Done "Download complete ($finalMB MB)"
+                Set-Progress 3 "ROS 2 Humble" 1 3 "Download complete" "done" "$finalMB MB"
+            } catch {
+                Write-Fail "Download failed: $_ -- download manually to: $zipPath"
+                Set-Progress 3 "ROS 2 Humble" 1 3 "Download" "fail" "both BITS and IWR failed"
+            }
         }
     }
 
@@ -282,25 +291,13 @@ New-Item -ItemType Directory -Force -Path "$ROS2_WS\src" | Out-Null
 Write-Done "Workspace created"
 Set-Progress 5 "Nav2 Workspace" 1 6 "Create workspace dirs" "done"
 
-# 5.2 Write nav2.repos
+# 5.2 Write nav2.repos  (MUST be UTF-8 no-BOM + LF endings -- Python vcs rejects BOM)
 Set-Progress 5 "Nav2 Workspace" 2 6 "Write nav2.repos" "running"
 $reposFile = "$ROS2_WS\nav2.repos"
-@(
-    "repositories:",
-    "  navigation2:",
-    "    type: git",
-    "    url: https://github.com/ros-navigation/navigation2.git",
-    "    version: humble",
-    "  slam_toolbox:",
-    "    type: git",
-    "    url: https://github.com/SteveMacenski/slam_toolbox.git",
-    "    version: humble",
-    "  robot_localization:",
-    "    type: git",
-    "    url: https://github.com/cra-ros-pkg/robot_localization.git",
-    "    version: humble"
-) | Out-File -FilePath $reposFile -Encoding utf8
-Write-Done "nav2.repos written"
+$yamlContent = "repositories:`n  navigation2:`n    type: git`n    url: https://github.com/ros-navigation/navigation2.git`n    version: humble`n  slam_toolbox:`n    type: git`n    url: https://github.com/SteveMacenski/slam_toolbox.git`n    version: humble`n  robot_localization:`n    type: git`n    url: https://github.com/cra-ros-pkg/robot_localization.git`n    version: humble`n"
+[System.IO.File]::WriteAllText($reposFile, $yamlContent, [System.Text.UTF8Encoding]::new($false))
+$bomCheck = [System.IO.File]::ReadAllBytes($reposFile)[0..2] | ForEach-Object { '{0:X2}' -f $_ }
+Write-Done "nav2.repos written (no BOM: $($bomCheck -join ' '))"
 Set-Progress 5 "Nav2 Workspace" 2 6 "Write nav2.repos" "done"
 
 # 5.3 vcs import
