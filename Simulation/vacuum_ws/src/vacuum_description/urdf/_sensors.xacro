@@ -1,22 +1,34 @@
 <?xml version="1.0"?>
 <!--
-  _sensors.xacro
-  ──────────────
-  Stage 1: Mounting point placeholders only — no sensor plugins yet.
-  Plugins (D435i RGB-D + IMU) will be added in Stage 3 (Sensors).
+  _sensors.xacro  (Stage 3 — Intel RealSense D435i Integration)
+  ──────────────────────────────────────────────────────────────
+  Replaces the Stage 1/2 placeholder with a complete camera model.
 
-  Links created:
-    camera_mount_link  — D435i camera position reference
-    arm_mount_link     — Robotic arm base attachment point
-    vacuum_mount_link  — Vacuum module attachment point
+  TF chain produced (follows Intel RealSense SDK + REP-103):
+    base_link
+      └── camera_mount_link     (Stage 1 placeholder, physical chassis bracket)
+            └── camera_link     (D435i body geometric centre)
+                  ├── camera_color_frame          (colour sensor plane)
+                  │     └── camera_color_optical_frame   (ROS optical convention)
+                  └── camera_depth_frame          (depth sensor plane)
+                        └── camera_depth_optical_frame   (ROS optical convention)
 
-  All joints are fixed (rigid mounts).
-  All links have minimal but non-zero mass for physical correctness.
+  Optical convention:
+    Standard frames (camera_*_frame):  x-forward, y-left, z-up
+    Optical frames (camera_*_optical): x-right, y-down, z-into-scene
+    Transform:  rpy = "-pi/2  0  -pi/2"
+
+  All numeric values are defined in _properties.xacro (Section 6).
+  Gazebo plugin (rgbd_camera sensor) lives in _gazebo.xacro.
+
+  Sim-to-real transfer note:
+    In hardware mode replace the Gazebo sensor with:
+      ros2 launch realsense2_camera rs_launch.py
+    No URDF changes needed — only the sensor plugin source changes.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- ── D435i Camera Mount ─────────────────────────────────────── -->
-  <!-- Front-top of chassis. The D435i will be attached here in Stage 3. -->
+  <!-- ── camera_mount_link (Stage 1 placeholder kept unchanged) ─── -->
   <xacro:mount_placeholder
     name="camera_mount"
     parent="base_link"
@@ -29,8 +41,104 @@
     mass="${camera_mount_mass}"
     mat="dark_grey"/>
 
-  <!-- ── Robotic Arm Mount ──────────────────────────────────────── -->
-  <!-- Rear-top of chassis. MoveIt2 arm will be attached here in Stage 6. -->
+  <!-- ═══════════════════════════════════════════════════════
+       camera_link — physical body of the D435i
+       ═══════════════════════════════════════════════════════ -->
+  <!--
+    Sits on top of camera_mount_link.
+    z-offset = mount_height/2 + d435i_body_z/2  (see _properties.xacro).
+    This link represents the geometric centre of the D435i enclosure.
+  -->
+  <joint name="camera_joint" type="fixed">
+    <parent link="camera_mount_link"/>
+    <child  link="camera_link"/>
+    <origin xyz="${camera_link_x} ${camera_link_y} ${camera_link_z}"
+            rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${d435i_body_x} ${d435i_body_y} ${d435i_body_z}"/>
+      </geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${d435i_body_x} ${d435i_body_y} ${d435i_body_z}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${d435i_mass}"/>
+      <inertia
+        ixx="${d435i_ixx}" ixy="0" ixz="0"
+        iyy="${d435i_iyy}" iyz="0"
+        izz="${d435i_izz}"/>
+    </inertial>
+  </link>
+
+  <!-- ═══════════════════════════════════════════════════════
+       camera_color_frame  (colour sensor, robot convention)
+       camera_color_optical_frame  (colour sensor, optical convention)
+       ═══════════════════════════════════════════════════════ -->
+
+  <joint name="camera_color_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child  link="camera_color_frame"/>
+    <origin xyz="${camera_color_x} ${camera_color_y} ${camera_color_z}"
+            rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_color_frame">
+    <!-- Massless optical frame — no visual/collision/inertial needed -->
+  </link>
+
+  <joint name="camera_color_optical_joint" type="fixed">
+    <parent link="camera_color_frame"/>
+    <child  link="camera_color_optical_frame"/>
+    <!--
+      Standard optical rotation: x-right, y-down, z-into-scene.
+      From robot convention: rpy = "-pi/2  0  -pi/2".
+    -->
+    <origin xyz="0 0 0"
+            rpy="${optical_roll} ${optical_pitch} ${optical_yaw}"/>
+  </joint>
+
+  <link name="camera_color_optical_frame">
+    <!-- Massless optical reference frame -->
+  </link>
+
+  <!-- ═══════════════════════════════════════════════════════
+       camera_depth_frame  (depth sensor, robot convention)
+       camera_depth_optical_frame  (depth sensor, optical convention)
+       ═══════════════════════════════════════════════════════ -->
+
+  <joint name="camera_depth_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child  link="camera_depth_frame"/>
+    <origin xyz="${camera_depth_x} ${camera_depth_y} ${camera_depth_z}"
+            rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_depth_frame">
+    <!-- Massless optical frame -->
+  </link>
+
+  <joint name="camera_depth_optical_joint" type="fixed">
+    <parent link="camera_depth_frame"/>
+    <child  link="camera_depth_optical_frame"/>
+    <origin xyz="0 0 0"
+            rpy="${optical_roll} ${optical_pitch} ${optical_yaw}"/>
+  </joint>
+
+  <link name="camera_depth_optical_frame">
+    <!-- Massless optical reference frame -->
+  </link>
+
+  <!-- ── Arm and vacuum mounts (unchanged from Stage 1) ─────────── -->
   <xacro:mount_placeholder
     name="arm_mount"
     parent="base_link"
@@ -43,8 +151,6 @@
     mass="${arm_mount_mass}"
     mat="yellow"/>
 
-  <!-- ── Vacuum Module Mount ────────────────────────────────────── -->
-  <!-- Front-bottom of chassis. Vacuum module will be attached in Stage 4. -->
   <xacro:mount_placeholder
     name="vacuum_mount"
     parent="base_link"

@@ -1,22 +1,71 @@
-# gz_bridge.yaml — Stage 2
+# gz_bridge.yaml  —  Stage 3 (Intel RealSense D435i added)
 # ─────────────────────────────────────────────────────────────────────────────
-# ROS ↔ Gazebo Harmonic topic bridge configuration
+# ROS <-> Gazebo Harmonic topic bridge configuration.
 # Used by: ros_gz_bridge/parameter_bridge in vacuum_bringup/launch/sim.launch.py
 #
 # Stage 2 note:
-#   gz_ros2_control now owns all robot I/O topics as native ROS2:
-#     /cmd_vel      → subscribed by diff_drive_controller (ROS2)
-#     /odom         → published by diff_drive_controller (ROS2)
-#     /tf           → published by diff_drive_controller (ROS2)
-#     /joint_states → published by joint_state_broadcaster (ROS2)
+#   gz_ros2_control owns all robot drive topics as native ROS2:
+#     /cmd_vel      - subscribed by diff_drive_controller (ROS2)
+#     /odom         - published  by diff_drive_controller (ROS2)
+#     /tf           - published  by diff_drive_controller (ROS2)
+#     /joint_states - published  by joint_state_broadcaster (ROS2)
 #
-#   ONLY /clock still needs bridging because Gazebo's physics clock
-#   must synchronise all ROS2 nodes that use use_sim_time: true.
+# Stage 3 additions:
+#   Gazebo rgbd_camera sensor (topic root: camera/image_raw) generates:
+#     camera/image_raw              -> colour image
+#     camera/image_raw/depth_image  -> depth image
+#     camera/image_raw/points       -> point cloud (PointCloudPacked)
+#     camera/image_raw/camera_info  -> colour camera info
+#
+#   All bridged to standard ROS topic names matching realsense2_camera driver
+#   so Stage 5+ (Nav2/RTABMap) can be used identically in sim and on hardware.
+#
+# Bridge type key:
+#   GZ_TO_ROS  — Gazebo publishes, ROS subscribes  (sensor data)
+#   ROS_TO_GZ  — ROS publishes,  Gazebo subscribes (commands, not used here)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Simulation clock — required for use_sim_time in ALL ROS2 nodes
+# ── Simulation clock — required by ALL ROS2 nodes using use_sim_time ─────────
 - ros_topic_name: "/clock"
   gz_topic_name:  "/clock"
   ros_type_name:  "rosgraph_msgs/msg/Clock"
   gz_type_name:   "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# ── D435i Colour Image ────────────────────────────────────────────────────────
+- ros_topic_name: "/camera/color/image_raw"
+  gz_topic_name:  "/camera/image_raw"
+  ros_type_name:  "sensor_msgs/msg/Image"
+  gz_type_name:   "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+# ── D435i Colour Camera Info ──────────────────────────────────────────────────
+- ros_topic_name: "/camera/color/camera_info"
+  gz_topic_name:  "/camera/image_raw/camera_info"
+  ros_type_name:  "sensor_msgs/msg/CameraInfo"
+  gz_type_name:   "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+# ── D435i Depth Image ─────────────────────────────────────────────────────────
+- ros_topic_name: "/camera/depth/image_rect_raw"
+  gz_topic_name:  "/camera/image_raw/depth_image"
+  ros_type_name:  "sensor_msgs/msg/Image"
+  gz_type_name:   "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+# ── D435i Depth Camera Info ───────────────────────────────────────────────────
+# Note: Gazebo rgbd_camera shares one CameraInfo for both colour and depth.
+# We bridge the same gz topic to two ROS topics to satisfy downstream consumers
+# (Nav2, RTABMap) that expect separate /camera/depth/camera_info.
+- ros_topic_name: "/camera/depth/camera_info"
+  gz_topic_name:  "/camera/image_raw/camera_info"
+  ros_type_name:  "sensor_msgs/msg/CameraInfo"
+  gz_type_name:   "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+# ── D435i Depth PointCloud2 ───────────────────────────────────────────────────
+- ros_topic_name: "/camera/depth/points"
+  gz_topic_name:  "/camera/image_raw/points"
+  ros_type_name:  "sensor_msgs/msg/PointCloud2"
+  gz_type_name:   "gz.msgs.PointCloudPacked"
   direction: GZ_TO_ROS

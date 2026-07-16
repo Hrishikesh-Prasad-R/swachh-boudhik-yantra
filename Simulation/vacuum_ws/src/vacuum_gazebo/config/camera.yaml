@@ -1,0 +1,113 @@
+# camera.yaml  —  Intel RealSense D435i Simulation Parameters  (Stage 3)
+# ─────────────────────────────────────────────────────────────────────────────
+# Used by:
+#   vacuum_bringup/launch/sim.launch.py  (loaded into camera_diagnostics_node)
+#   vacuum_utils/scripts/benchmark_camera.py
+#   vacuum_utils/scripts/validate_camera.sh
+#
+# Design rule: NEVER hardcode sensor parameters in source code.
+# Change values here; all downstream nodes pick them up automatically.
+#
+# Noise modes:
+#   ideal     — zero noise; use for initial pipeline validation and SLAM tuning
+#   realistic — Gaussian noise; use for EKF covariance estimation and robustness
+#
+# To switch modes at runtime:
+#   1. Edit noise_mode below  OR
+#   2. Launch with override:
+#      ros2 launch vacuum_bringup sim.launch.py camera_noise_mode:=realistic
+# ─────────────────────────────────────────────────────────────────────────────
+
+camera_diagnostics_node:
+  ros__parameters:
+
+    # ── Sensor identity ───────────────────────────────────────────────────────
+    camera_name:    d435i
+    camera_model:   Intel RealSense D435i (Simulated)
+
+    # ── Active noise mode ─────────────────────────────────────────────────────
+    # Options: "ideal" | "realistic"
+    noise_mode: ideal
+
+    # ── Resolution & frame rate ───────────────────────────────────────────────
+    color:
+      width:  640
+      height: 480
+      fps:    30
+      # Horizontal FOV in degrees (reference: 69.4° from D435i datasheet)
+      hfov_deg: 69.4
+      # Corresponding radians: 1.2112
+      hfov_rad: 1.2112
+      encoding: rgb8
+
+    depth:
+      width:  640
+      height: 480
+      fps:    30
+      # Horizontal FOV in degrees (reference: 86.0° from D435i datasheet)
+      hfov_deg: 86.0
+      # Corresponding radians: 1.5010
+      hfov_rad: 1.5010
+      encoding: 32FC1   # 32-bit float metres
+
+    # ── Clipping planes ──────────────────────────────────────────────────────
+    clip:
+      near_m: 0.105   # 10.5 cm  (D435i minimum operating distance)
+      far_m:  10.0    # 10.0 m   (D435i maximum reliable depth range)
+
+    # ── Noise parameters ──────────────────────────────────────────────────────
+    # ideal mode values (used when noise_mode == "ideal"):
+    ideal:
+      depth_noise_mean:   0.0
+      depth_noise_stddev: 0.0
+      color_noise_mean:   0.0
+      color_noise_stddev: 0.0
+
+    # realistic mode values (used when noise_mode == "realistic"):
+    # Depth noise model: Gaussian approximation of structured-light error
+    #   At 1m:   stddev ~5mm (0.5%)
+    #   At 3m:   stddev ~25mm (measured on D435i at 3m)
+    # Colour noise: CMOS sensor read noise approximation
+    realistic:
+      depth_noise_mean:   0.0
+      depth_noise_stddev: 0.005    # metres at 1m range
+      color_noise_mean:   0.0
+      color_noise_stddev: 0.007    # normalised [0,1] pixel intensity
+
+    # ── ROS topic names ───────────────────────────────────────────────────────
+    # These must match gz_bridge.yaml ros_topic_name entries.
+    topics:
+      color_image:      /camera/color/image_raw
+      color_info:       /camera/color/camera_info
+      depth_image:      /camera/depth/image_rect_raw
+      depth_info:       /camera/depth/camera_info
+      depth_points:     /camera/depth/points
+
+    # ── TF frame IDs ─────────────────────────────────────────────────────────
+    frames:
+      camera_link:               camera_link
+      color_frame:               camera_color_frame
+      color_optical_frame:       camera_color_optical_frame
+      depth_frame:               camera_depth_frame
+      depth_optical_frame:       camera_depth_optical_frame
+
+    # ── Diagnostics thresholds ────────────────────────────────────────────────
+    diagnostics:
+      # Minimum acceptable frame rate (Hz) — alert if below this
+      min_fps_color:     25.0
+      min_fps_depth:     25.0
+      min_fps_points:    10.0
+      # Maximum allowed latency (seconds) — alert if above this
+      max_latency_s:     0.10
+      # Alert if more than this fraction of frames are dropped
+      max_drop_fraction: 0.05
+      # Publication window for FPS averaging (seconds)
+      fps_window_s:      2.0
+      # Diagnostics publish rate (Hz)
+      publish_rate_hz:   5.0
+
+    # ── Benchmark settings ────────────────────────────────────────────────────
+    benchmark:
+      duration_s:    60          # run benchmark for this many seconds
+      warmup_s:      5           # discard first N seconds (startup transients)
+      output_dir:    bags/stage3 # relative to workspace root

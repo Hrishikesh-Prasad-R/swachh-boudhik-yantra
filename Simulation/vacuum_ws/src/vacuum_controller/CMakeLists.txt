@@ -25,6 +25,7 @@ install(
   PROGRAMS
     vacuum_controller/odometry_noise_node.py
     vacuum_controller/motion_diagnostics_node.py
+    vacuum_controller/camera_diagnostics_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

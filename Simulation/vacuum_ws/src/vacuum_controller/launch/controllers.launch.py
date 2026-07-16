@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """
-controllers.launch.py — Stage 2 Controller Spawner
-────────────────────────────────────────────────────
-Spawns both ros2_control controllers after the controller_manager
-(started by gz_ros2_control plugin when the robot spawns in Gazebo).
+controllers.launch.py — Stage 3 (D435i + Controller Orchestration)
+────────────────────────────────────────────────────────────────────
+Spawns ros2_control controllers AND the camera diagnostics node.
 
 Startup sequence:
-  1. Gazebo starts with gz_ros2_control plugin (creates /controller_manager)
-  2. Robot spawns into Gazebo (3s after sim.launch.py starts)
-  3. This launch spawns:
-      a. joint_state_broadcaster   (publishes /joint_states → TF for wheels)
-      b. diff_drive_controller     (drives robot, publishes /odom + /tf)
-  4. Optional: OdometryNoiseNode and MotionDiagnosticsNode
-
-Controllers are spawned with delay to guarantee controller_manager is up.
-The spawner node exits normally after activation — this is expected behaviour.
+  t=0s   Gazebo starts with gz_ros2_control plugin
+  t=3s   Robot + D435i sensor spawned into Gazebo
+  t=5s   joint_state_broadcaster spawned
+  t=6s   diff_drive_controller spawned
+  t=7s   cmd_vel relay active
+  t=8s   OdometryNoiseNode + MotionDiagnosticsNode
+  t=10s  CameraDiagnosticsNode (waits for camera bridge to stabilise)
 
 Usage:
   Included by vacuum_bringup/launch/sim.launch.py automatically.
@@ -32,6 +29,10 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
+    camera_yaml = os.path.join(
+        get_package_share_directory('vacuum_gazebo'),
+        'config', 'camera.yaml')
+
     # ── Arguments ──────────────────────────────────────────────────
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
@@ -42,6 +43,9 @@ def generate_launch_description():
     declare_enable_diagnostics = DeclareLaunchArgument(
         'enable_diagnostics', default_value='true',
         description='Enable motion diagnostics node')
+    declare_enable_cam_diag = DeclareLaunchArgument(
+        'enable_camera_diagnostics', default_value='true',
+        description='Enable D435i camera diagnostics node')
 
     use_sim_time     = LaunchConfiguration('use_sim_time')
     enable_noise     = LaunchConfiguration('enable_odom_noise')
@@ -143,13 +147,34 @@ def generate_launch_description():
         ],
     )
 
+    # ── Camera Diagnostics Node (Stage 3) ──────────────────────────
+    # Started 10s after launch to ensure the gz_bridge is publishing
+    # and the camera topics have stabilised from startup transients.
+    camera_diagnostics_node = TimerAction(
+        period=10.0,
+        actions=[
+            Node(
+                package='vacuum_controller',
+                executable='camera_diagnostics_node.py',
+                name='camera_diagnostics_node',
+                parameters=[
+                    camera_yaml,
+                    {'use_sim_time': use_sim_time},
+                ],
+                output='screen',
+            )
+        ],
+    )
+
     return LaunchDescription([
         declare_use_sim_time,
         declare_enable_noise,
         declare_enable_diagnostics,
+        declare_enable_cam_diag,
         joint_state_broadcaster_spawner,
         diff_drive_controller_spawner,
         cmd_vel_relay,
         odometry_noise_node,
         motion_diagnostics_node,
+        camera_diagnostics_node,
     ])

@@ -11,7 +11,9 @@ install(
     scripts/collect_metrics.py
     scripts/validate_urdf.sh
     scripts/validate_controllers.sh
+    scripts/validate_camera.sh
     scripts/record_trajectory.py
+    scripts/benchmark_camera.py
     scripts/graphify.py
   DESTINATION lib/${PROJECT_NAME}
 )

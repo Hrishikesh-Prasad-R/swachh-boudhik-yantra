@@ -136,4 +136,63 @@
   <xacro:property name="vacuum_mount_z"
     value="${-(chassis_height/2 + vacuum_mount_height/2)}"/>  <!-- = -0.055 -->
 
+  <!-- ==========================================================
+       6. INTEL REALSENSE D435i  (Stage 3)
+          All values sourced from Intel D435i datasheet v0.9.
+       ========================================================== -->
+
+  <!-- D435i body: 90mm W x 25mm H x 25mm D, 72g -->
+  <xacro:property name="d435i_body_x" value="0.025"/>  <!-- depth into scene -->
+  <xacro:property name="d435i_body_y" value="0.090"/>  <!-- width -->
+  <xacro:property name="d435i_body_z" value="0.025"/>  <!-- height -->
+  <xacro:property name="d435i_mass"   value="0.072"/>  <!-- kg -->
+
+  <!--
+    camera_link inertia (box, m=0.072kg, x=0.025m, y=0.090m, z=0.025m):
+      Ixx=(1/12)*m*(y^2+z^2) = (1/12)*0.072*(0.0081+0.000625) = 5.24e-5
+      Iyy=(1/12)*m*(x^2+z^2) = (1/12)*0.072*(0.000625+0.000625) = 7.5e-6
+      Izz=(1/12)*m*(x^2+y^2) = (1/12)*0.072*(0.000625+0.0081)   = 5.24e-5
+  -->
+  <xacro:property name="d435i_ixx" value="0.0000524"/>
+  <xacro:property name="d435i_iyy" value="0.0000075"/>
+  <xacro:property name="d435i_izz" value="0.0000524"/>
+
+  <!-- camera_link offset from camera_mount_link (sits on top) -->
+  <xacro:property name="camera_link_x" value="0.0"/>
+  <xacro:property name="camera_link_y" value="0.0"/>
+  <xacro:property name="camera_link_z"
+    value="${camera_mount_height/2 + d435i_body_z/2}"/>  <!-- = 0.025 -->
+
+  <!-- colour module: +11.5mm right on real hw; co-located in sim -->
+  <xacro:property name="camera_color_x" value="0.0"/>
+  <xacro:property name="camera_color_y" value="0.0"/>
+  <xacro:property name="camera_color_z" value="0.0"/>
+
+  <!-- depth module: at body centre on real hw -->
+  <xacro:property name="camera_depth_x" value="0.0"/>
+  <xacro:property name="camera_depth_y" value="0.0"/>
+  <xacro:property name="camera_depth_z" value="0.0"/>
+
+  <!--
+    Optical frame rotation: robot convention (x-fwd) to optical (z-fwd,x-right,y-down)
+    rpy = "-pi/2  0  -pi/2"
+  -->
+  <xacro:property name="optical_roll"  value="-1.5707963"/>
+  <xacro:property name="optical_pitch" value="0.0"/>
+  <xacro:property name="optical_yaw"   value="-1.5707963"/>
+
+  <!-- D435i Gazebo sensor parameters (baked at Xacro expansion; tune via camera.yaml) -->
+  <xacro:property name="d435i_color_width"  value="640"/>
+  <xacro:property name="d435i_color_height" value="480"/>
+  <xacro:property name="d435i_color_fps"    value="30"/>
+  <xacro:property name="d435i_color_hfov"   value="1.2112"/>  <!-- 69.4 deg -->
+
+  <xacro:property name="d435i_depth_width"  value="640"/>
+  <xacro:property name="d435i_depth_height" value="480"/>
+  <xacro:property name="d435i_depth_fps"    value="30"/>
+  <xacro:property name="d435i_depth_hfov"   value="1.5010"/>  <!-- 86.0 deg -->
+
+  <xacro:property name="d435i_near_clip"    value="0.105"/>  <!-- m -->
+  <xacro:property name="d435i_far_clip"     value="10.0"/>   <!-- m -->
+
 </robot>
