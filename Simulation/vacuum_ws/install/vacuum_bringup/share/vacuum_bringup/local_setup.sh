@@ -1,1 +1,0 @@
-/home/bmscecse/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/build/vacuum_bringup/ament_cmake_environment_hooks/local_setup.sh

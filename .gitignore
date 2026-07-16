@@ -12,6 +12,9 @@
 Simulation/vacuum_ws/build/
 Simulation/vacuum_ws/install/
 Simulation/vacuum_ws/log/
+# Root-level colcon artifacts (if built at project root)
+/install/
+/log/
 
 # ── Rosbag recordings ─────────────────────────────────────────
 *.bag
@@ -22,6 +25,9 @@ bags/
 
 # ── Graphify output ───────────────────────────────────────────
 Simulation/vacuum_ws/graphify_output/
+
+# ── Agent / IDE internal directories ─────────────────────────
+.agents/
 
 
 # ── Python ────────────────────────────────────────────────────

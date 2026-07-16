@@ -12,8 +12,10 @@ install(
     scripts/validate_urdf.sh
     scripts/validate_controllers.sh
     scripts/record_trajectory.py
+    scripts/graphify.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 
 if(BUILD_TESTING)

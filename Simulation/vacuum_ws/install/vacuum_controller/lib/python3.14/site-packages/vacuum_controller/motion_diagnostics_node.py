@@ -1,1 +1,0 @@
-/home/bmscecse/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/src/vacuum_controller/vacuum_controller/motion_diagnostics_node.py
