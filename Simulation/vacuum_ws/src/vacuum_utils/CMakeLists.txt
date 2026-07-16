@@ -4,20 +4,17 @@ project(vacuum_utils)
 find_package(ament_cmake REQUIRED)
 find_package(rclpy REQUIRED)
 
-# Install Python scripts as executables
+# Install all scripts as executables
 install(
   PROGRAMS
     scripts/check_tf.py
     scripts/collect_metrics.py
+    scripts/validate_urdf.sh
+    scripts/validate_controllers.sh
+    scripts/record_trajectory.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install shell scripts
-install(
-  PROGRAMS
-    scripts/validate_urdf.sh
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

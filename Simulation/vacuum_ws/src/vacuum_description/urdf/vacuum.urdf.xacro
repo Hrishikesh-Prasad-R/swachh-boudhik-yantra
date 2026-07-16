@@ -28,7 +28,9 @@
   <xacro:include filename="$(find vacuum_description)/urdf/_macros.xacro"/>
   <xacro:include filename="$(find vacuum_description)/urdf/_base.xacro"/>
   <xacro:include filename="$(find vacuum_description)/urdf/_wheels.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_ros2_control.xacro"/>
   <xacro:include filename="$(find vacuum_description)/urdf/_sensors.xacro"/>
   <xacro:include filename="$(find vacuum_description)/urdf/_gazebo.xacro"/>
+
 
 </robot>

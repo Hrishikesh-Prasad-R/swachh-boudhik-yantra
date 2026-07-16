@@ -1,0 +1,128 @@
+# controllers.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# ros2_control controller configuration for the Swachh Boudhik Yantra vacuum robot.
+#
+# Loaded by: gz_ros2_control::GazeboSimROS2ControlPlugin (via _gazebo.xacro)
+# Also used by: vacuum_controller/launch/controllers.launch.py (spawner nodes)
+#
+# Hierarchy:
+#   controller_manager — manages lifecycle of all controllers
+#     joint_state_broadcaster — reads joint states → publishes /joint_states
+#     diff_drive_controller   — reads /cmd_vel → writes wheel velocities
+#                                              → publishes /odom, /tf
+#
+# Design rule: ALL values come from this file. Nothing hardcoded in launch files.
+#
+# Kinematic parameters MUST match _properties.xacro:
+#   wheel_separation = 0.268 m
+#   wheel_radius     = 0.033 m
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Controller Manager ────────────────────────────────────────────────────────
+controller_manager:
+  ros__parameters:
+    # Control loop frequency — 50 Hz matches Gazebo physics step (1000 Hz / 20)
+    # Higher = more responsive but more CPU. 50 Hz is the ROS2 standard.
+    update_rate: 50  # Hz
+
+    # Register controllers (type determines the plugin to load)
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    diff_drive_controller:
+      type: diff_drive_controller/DiffDriveController
+
+
+# ── Joint State Broadcaster ────────────────────────────────────────────────────
+# Reads all joint states from the hardware interface and publishes to /joint_states.
+# robot_state_publisher subscribes to /joint_states to publish TF for wheel links.
+joint_state_broadcaster:
+  ros__parameters:
+    # Publish all joints by default — leave empty to broadcast all
+    joints: []
+
+
+# ── Differential Drive Controller ─────────────────────────────────────────────
+# Full differential drive kinematic model + velocity limiter + odometry publisher.
+# This is the reference implementation from ros2_controllers; well-tested, Nav2 ready.
+diff_drive_controller:
+  ros__parameters:
+
+    # ── Joint configuration ──────────────────────────────────────────────────
+    # Names MUST exactly match URDF joint names
+    left_wheel_names:  ["left_wheel_joint"]
+    right_wheel_names: ["right_wheel_joint"]
+
+    # ── Robot kinematics ─────────────────────────────────────────────────────
+    # wheel_separation: distance between wheel centre planes (metres)
+    #   = 0.268 m  (from _properties.xacro: wheel_separation)
+    # wheel_radius: drive wheel radius (metres)
+    #   = 0.033 m  (from _properties.xacro: wheel_radius)
+    wheel_separation: 0.268
+    wheel_radius:     0.033
+
+    # Correction multipliers for manufacturing tolerances.
+    # Start at 1.0. Tune during hardware calibration in Stage 10.
+    wheel_separation_multiplier: 1.0
+    left_wheel_radius_multiplier: 1.0
+    right_wheel_radius_multiplier: 1.0
+
+    # ── Odometry ─────────────────────────────────────────────────────────────
+    publish_rate: 30.0  # Hz — odometry and TF publication rate
+
+    odom_frame_id:  odom
+    base_frame_id:  base_footprint
+
+    # Open-loop = ignore encoder feedback for odometry (pure cmd_vel integration).
+    # False = closed-loop with encoder feedback (more accurate).
+    open_loop: false
+
+    # Sliding window for velocity estimation from encoder position differences.
+    # Larger window = smoother but more lag. 10 is a good default.
+    velocity_rolling_window_size: 10
+
+    # Publish the odom→base_footprint transform on /tf.
+    # robot_state_publisher publishes base_footprint→base_link and fixed joints.
+    enable_odom_tf: true
+
+    # pose_covariance_diagonal:  [x, y, z, roll, pitch, yaw]
+    # twist_covariance_diagonal: [vx, vy, vz, wx, wy, wz]
+    # For a ground robot: z, roll, pitch are constrained (large covariance = unknown)
+    # x, y, yaw are estimated by odometry (small covariance = trusted)
+    pose_covariance_diagonal:
+      [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.001]
+    twist_covariance_diagonal:
+      [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 0.01]
+
+    # ── Command interface ─────────────────────────────────────────────────────
+    # Topic: /diff_drive_controller/cmd_vel (or remapped to /cmd_vel in launch)
+    # use_stamped_vel: false = accept geometry_msgs/msg/Twist (standard)
+    #                  true  = accept geometry_msgs/msg/TwistStamped
+    use_stamped_vel: false
+
+    # cmd_vel_timeout: stop the robot if no command received for this many seconds.
+    # This is a critical safety feature — prevents runaway on network interruption.
+    cmd_vel_timeout: 0.5  # seconds
+
+    # ── Velocity limits ───────────────────────────────────────────────────────
+    # These limits are applied AFTER the command is received.
+    # They clip the output before it reaches the hardware interface.
+    linear:
+      x:
+        has_velocity_limits:    true
+        max_velocity:           0.5    # m/s  (design maximum for indoor vacuum)
+        min_velocity:          -0.5    # m/s  (reverse at same speed)
+        has_acceleration_limits: true
+        max_acceleration:       1.0    # m/s² (comfortable for indoor use)
+        min_acceleration:      -1.0    # m/s² (braking)
+        has_jerk_limits:       false   # jerk not needed for Stage 2
+
+    angular:
+      z:
+        has_velocity_limits:    true
+        max_velocity:           2.0    # rad/s (~115 deg/s, snappy rotation)
+        min_velocity:          -2.0    # rad/s
+        has_acceleration_limits: true
+        max_acceleration:       2.0    # rad/s²
+        min_acceleration:      -2.0    # rad/s²
+        has_jerk_limits:       false

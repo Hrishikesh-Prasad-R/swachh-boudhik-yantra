@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+            schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>vacuum_controller</name>
+  <version>0.2.0</version>
+  <description>
+    Stage 2 — ros2_control integration for the Swachh Boudhik Yantra vacuum robot.
+    Contains controller YAML configuration, controller spawner launch,
+    odometry noise simulation node, and motion diagnostics node.
+  </description>
+  <maintainer email="team@swachh-boudhik-yantra.local">Vacuum Robot Team</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <!-- ros2_control stack -->
+  <depend>ros2_control</depend>
+  <depend>ros2_controllers</depend>
+  <depend>controller_manager</depend>
+  <depend>diff_drive_controller</depend>
+  <depend>joint_state_broadcaster</depend>
+
+  <!-- gz_ros2_control bridge -->
+  <depend>gz_ros2_control</depend>
+
+  <!-- Python nodes -->
+  <depend>rclpy</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,1 @@
+controller_manager:diagnostic_msgs:diff_drive_controller:geometry_msgs:gz_ros2_control:joint_state_broadcaster:nav_msgs:rclpy:ros2_control:ros2_controllers:sensor_msgs:std_msgs
