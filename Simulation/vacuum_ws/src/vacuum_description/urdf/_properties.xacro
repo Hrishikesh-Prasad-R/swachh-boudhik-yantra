@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!--
+  _properties.xacro
+  ─────────────────
+  Single source of truth for ALL robot dimensions, masses, and
+  derived positional constants.
+
+  Design rule: NEVER hardcode a number outside this file.
+  All other xacro files pull values from here via ${property_name}.
+
+  Geometry coordinate convention:
+    x → forward (robot front)
+    y → left
+    z → up
+
+  Inertia formulae used (documented for reproducibility):
+    Box  : Ixx=(1/12)m(y²+z²)  Iyy=(1/12)m(x²+z²)  Izz=(1/12)m(x²+y²)
+    Cylinder (axis=y): Ixx=Izz=(1/12)m(3r²+h²)  Iyy=(1/2)mr²
+    Sphere : Ixx=Iyy=Izz=(2/5)mr²
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ═══════════════════════════════════════════════════════
+       1. CHASSIS
+       ═══════════════════════════════════════════════════════ -->
+  <xacro:property name="chassis_length" value="0.300"/>  <!-- x, m -->
+  <xacro:property name="chassis_width"  value="0.250"/>  <!-- y, m -->
+  <xacro:property name="chassis_height" value="0.100"/>  <!-- z, m -->
+  <xacro:property name="chassis_mass"   value="2.000"/>  <!-- kg   -->
+
+  <!--
+    Chassis inertia (box):
+      Ixx = (1/12)*2.0*(0.25²+0.10²) = 0.012083 kg·m²
+      Iyy = (1/12)*2.0*(0.30²+0.10²) = 0.016667 kg·m²
+      Izz = (1/12)*2.0*(0.30²+0.25²) = 0.025417 kg·m²
+  -->
+  <xacro:property name="chassis_ixx" value="0.012083"/>
+  <xacro:property name="chassis_iyy" value="0.016667"/>
+  <xacro:property name="chassis_izz" value="0.025417"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       2. DRIVE WHEELS
+       ═══════════════════════════════════════════════════════ -->
+  <xacro:property name="wheel_radius"     value="0.033"/>  <!-- m  -->
+  <xacro:property name="wheel_thickness"  value="0.018"/>  <!-- m  -->
+  <xacro:property name="wheel_mass"       value="0.250"/>  <!-- kg -->
+  <!-- wheel_separation: distance between wheel centre-planes -->
+  <xacro:property name="wheel_separation" value="0.268"/>  <!-- m  -->
+
+  <!--
+    Wheel inertia (cylinder, rotation axis = y):
+      Ixx=Izz = (1/12)*0.25*(3*0.033²+0.018²) = 7.484e-5 kg·m²
+      Iyy     = (1/2) *0.25*(0.033²)           = 1.361e-4 kg·m²
+  -->
+  <xacro:property name="wheel_ixx" value="0.000074843"/>
+  <xacro:property name="wheel_iyy" value="0.000136125"/>
+  <xacro:property name="wheel_izz" value="0.000074843"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       3. CASTER WHEEL  (passive front ball caster)
+       ═══════════════════════════════════════════════════════ -->
+  <xacro:property name="caster_radius" value="0.018"/>  <!-- m  -->
+  <xacro:property name="caster_mass"   value="0.050"/>  <!-- kg -->
+
+  <!--
+    Caster inertia (sphere):
+      I = (2/5)*0.05*(0.018²) = 6.48e-6 kg·m²
+  -->
+  <xacro:property name="caster_ixx" value="0.0000065"/>
+  <xacro:property name="caster_iyy" value="0.0000065"/>
+  <xacro:property name="caster_izz" value="0.0000065"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       4. DERIVED POSITIONAL CONSTANTS
+       ═══════════════════════════════════════════════════════ -->
+
+  <!--
+    base_link_z: height of base_link origin above ground.
+
+    Geometry rationale:
+      - Drive wheels touch the ground → wheel_center_z = wheel_radius = 0.033 m
+      - Chassis bottom clearance above ground = 0.043 m
+        (the chassis sits on the axle, plus 10 mm clearance)
+      - base_link placed at chassis geometric centre
+        = clearance + chassis_height/2 = 0.043 + 0.050 = 0.093 m
+  -->
+  <xacro:property name="base_link_z"     value="0.093"/>  <!-- m above ground -->
+
+  <!-- Wheel joint origin in base_link frame:
+       z_wheel_world = wheel_radius = 0.033 m
+       z_wheel_in_base_link = 0.033 - 0.093 = -0.060 m
+       y_wheel = ± wheel_separation/2 = ± 0.134 m
+  -->
+  <xacro:property name="wheel_joint_z"   value="-0.060"/>
+  <xacro:property name="wheel_joint_y"   value="0.134"/>  <!-- half separation -->
+
+  <!-- Caster joint origin in base_link frame:
+       z_caster_world = caster_radius = 0.018 m
+       z_caster_in_base_link = 0.018 - 0.093 = -0.075 m
+       x_caster = front edge of chassis = chassis_length/2 - caster_radius = 0.132 m
+  -->
+  <xacro:property name="caster_joint_x"  value="0.132"/>
+  <xacro:property name="caster_joint_z"  value="-0.075"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       5. SENSOR / MODULE MOUNTS  (placeholder geometry)
+       ═══════════════════════════════════════════════════════ -->
+
+  <!-- Intel D435i camera mount — front top of chassis -->
+  <xacro:property name="camera_mount_length" value="0.025"/>  <!-- x -->
+  <xacro:property name="camera_mount_width"  value="0.090"/>  <!-- y -->
+  <xacro:property name="camera_mount_height" value="0.025"/>  <!-- z -->
+  <xacro:property name="camera_mount_mass"   value="0.050"/>  <!-- kg -->
+  <xacro:property name="camera_mount_x"      value="0.100"/>
+  <!-- Sits on top of chassis: chassis_top_in_base_link + half_own_height -->
+  <!-- chassis top from base_link = +chassis_height/2 = +0.050 -->
+  <xacro:property name="camera_mount_z"
+    value="${chassis_height/2 + camera_mount_height/2}"/>  <!-- = 0.0625 -->
+
+  <!-- Robotic arm mount — rear top of chassis -->
+  <xacro:property name="arm_mount_length" value="0.050"/>
+  <xacro:property name="arm_mount_width"  value="0.050"/>
+  <xacro:property name="arm_mount_height" value="0.020"/>
+  <xacro:property name="arm_mount_mass"   value="0.050"/>
+  <xacro:property name="arm_mount_x"      value="-0.050"/>
+  <xacro:property name="arm_mount_z"
+    value="${chassis_height/2 + arm_mount_height/2}"/>  <!-- = 0.060 -->
+
+  <!-- Vacuum module mount — front bottom of chassis -->
+  <xacro:property name="vacuum_mount_length" value="0.060"/>
+  <xacro:property name="vacuum_mount_width"  value="0.060"/>
+  <xacro:property name="vacuum_mount_height" value="0.010"/>
+  <xacro:property name="vacuum_mount_mass"   value="0.100"/>
+  <xacro:property name="vacuum_mount_x"      value="0.080"/>
+  <!-- Hangs below chassis: -(chassis_height/2 + half_own_height) -->
+  <xacro:property name="vacuum_mount_z"
+    value="${-(chassis_height/2 + vacuum_mount_height/2)}"/>  <!-- = -0.055 -->
+
+</robot>

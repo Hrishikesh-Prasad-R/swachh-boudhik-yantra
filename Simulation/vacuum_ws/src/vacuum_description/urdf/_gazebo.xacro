@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<!--
+  _gazebo.xacro
+  ─────────────
+  Gazebo Harmonic (Gz 8) simulation properties and plugins.
+
+  Contents:
+    1. Per-link surface friction and contact properties
+    2. Per-link visual material overrides (Gazebo renderer)
+    3. DiffDrive plugin — differential drive kinematics + odometry
+    4. JointStatePublisher plugin — publishes joint positions for TF
+
+  Plugin naming convention (Gz 8 / Gazebo Harmonic):
+    filename: "gz-sim-<name>-system"
+    name:     "gz::sim::systems::<ClassName>"
+
+  Plugin libs located at:
+    /opt/ros/jazzy/opt/gz_sim_vendor/lib/gz-sim-8/plugins/
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ═══════════════════════════════════════════════════════
+       1. SURFACE PROPERTIES
+       ═══════════════════════════════════════════════════════ -->
+
+  <!-- Chassis — standard friction -->
+  <gazebo reference="base_link">
+    <material>Gazebo/Grey</material>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <!-- Drive wheels — high friction for grip (no wheel slip) -->
+  <gazebo reference="left_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <mu1>200.0</mu1>
+    <mu2>100.0</mu2>
+    <kp>1.0e+6</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <gazebo reference="right_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <mu1>200.0</mu1>
+    <mu2>100.0</mu2>
+    <kp>1.0e+6</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <!-- Caster wheel — near-zero friction for free rolling -->
+  <gazebo reference="caster_wheel_link">
+    <material>Gazebo/White</material>
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+    <kp>1.0e+6</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <!-- Mount placeholders — no special physics needed -->
+  <gazebo reference="camera_mount_link">
+    <material>Gazebo/DarkGrey</material>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <gazebo reference="arm_mount_link">
+    <material>Gazebo/Yellow</material>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <gazebo reference="vacuum_mount_link">
+    <material>Gazebo/Blue</material>
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       2. DIFFERENTIAL DRIVE PLUGIN (Gazebo Harmonic)
+       ═══════════════════════════════════════════════════════ -->
+  <!--
+    Subscribes to:  /cmd_vel  (gz.msgs.Twist)
+    Publishes:      /odom     (gz.msgs.Odometry)
+                    /tf       (gz.msgs.Pose_V)  odom→base_footprint
+
+    These Gazebo topics are bridged to ROS2 by ros_gz_bridge
+    (see vacuum_gazebo/config/gz_bridge.yaml).
+
+    child_frame_id = "base_footprint" is required for Nav2 compliance.
+  -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+
+      <!-- Joint names must match exactly the URDF joint names -->
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+
+      <!-- Kinematic parameters — must match _properties.xacro -->
+      <wheel_separation>${wheel_separation}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+
+      <!-- Velocity limits (m/s and rad/s) -->
+      <max_linear_velocity>0.50</max_linear_velocity>
+      <min_linear_velocity>-0.50</min_linear_velocity>
+      <max_angular_velocity>2.00</max_angular_velocity>
+      <min_angular_velocity>-2.00</min_angular_velocity>
+
+      <!-- Acceleration limits -->
+      <max_linear_acceleration>1.00</max_linear_acceleration>
+      <min_linear_acceleration>-1.00</min_linear_acceleration>
+      <max_angular_acceleration>2.00</max_angular_acceleration>
+      <min_angular_acceleration>-2.00</min_angular_acceleration>
+
+      <!-- Input command topic -->
+      <topic>cmd_vel</topic>
+
+      <!-- Output topics -->
+      <odom_topic>odom</odom_topic>
+      <tf_topic>tf</tf_topic>
+
+      <!-- Frame ids for odometry message -->
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+
+      <!-- Publication flags -->
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+      <publish_wheel_tf>false</publish_wheel_tf>  <!-- wheel TF from robot_state_publisher -->
+
+      <odom_publish_frequency>30</odom_publish_frequency>
+
+    </plugin>
+  </gazebo>
+
+  <!-- ═══════════════════════════════════════════════════════
+       3. JOINT STATE PUBLISHER PLUGIN (Gazebo Harmonic)
+       ═══════════════════════════════════════════════════════ -->
+  <!--
+    Publishes joint positions so robot_state_publisher can compute TF
+    for all links (wheels, mounts, etc.).
+
+    Publishes: /joint_states (gz.msgs.Model)
+    Bridged to ROS2 sensor_msgs/msg/JointState by ros_gz_bridge.
+  -->
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+      <update_rate>50</update_rate>
+    </plugin>
+  </gazebo>
+
+</robot>

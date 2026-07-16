@@ -1,0 +1,1 @@
+/home/bmscecse/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/build/vacuum_bringup/ament_cmake_core/vacuum_bringupConfig-version.cmake

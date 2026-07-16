@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<!--
+  _sensors.xacro
+  ──────────────
+  Stage 1: Mounting point placeholders only — no sensor plugins yet.
+  Plugins (D435i RGB-D + IMU) will be added in Stage 3 (Sensors).
+
+  Links created:
+    camera_mount_link  — D435i camera position reference
+    arm_mount_link     — Robotic arm base attachment point
+    vacuum_mount_link  — Vacuum module attachment point
+
+  All joints are fixed (rigid mounts).
+  All links have minimal but non-zero mass for physical correctness.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ── D435i Camera Mount ─────────────────────────────────────── -->
+  <!-- Front-top of chassis. The D435i will be attached here in Stage 3. -->
+  <xacro:mount_placeholder
+    name="camera_mount"
+    parent="base_link"
+    x="${camera_mount_x}"
+    y="0.0"
+    z="${camera_mount_z}"
+    l="${camera_mount_length}"
+    w="${camera_mount_width}"
+    h="${camera_mount_height}"
+    mass="${camera_mount_mass}"
+    mat="dark_grey"/>
+
+  <!-- ── Robotic Arm Mount ──────────────────────────────────────── -->
+  <!-- Rear-top of chassis. MoveIt2 arm will be attached here in Stage 6. -->
+  <xacro:mount_placeholder
+    name="arm_mount"
+    parent="base_link"
+    x="${arm_mount_x}"
+    y="0.0"
+    z="${arm_mount_z}"
+    l="${arm_mount_length}"
+    w="${arm_mount_width}"
+    h="${arm_mount_height}"
+    mass="${arm_mount_mass}"
+    mat="yellow"/>
+
+  <!-- ── Vacuum Module Mount ────────────────────────────────────── -->
+  <!-- Front-bottom of chassis. Vacuum module will be attached in Stage 4. -->
+  <xacro:mount_placeholder
+    name="vacuum_mount"
+    parent="base_link"
+    x="${vacuum_mount_x}"
+    y="0.0"
+    z="${vacuum_mount_z}"
+    l="${vacuum_mount_length}"
+    w="${vacuum_mount_width}"
+    h="${vacuum_mount_height}"
+    mass="${vacuum_mount_mass}"
+    mat="blue"/>
+
+</robot>

@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<!--
+  _macros.xacro
+  ─────────────
+  Reusable Xacro macros:
+    • box_inertia        — inertial block for box-shaped links
+    • cylinder_inertia   — inertial block for cylinders (wheel axis = y)
+    • sphere_inertia     — inertial block for sphere-shaped links
+    • drive_wheel        — complete left/right wheel (link + joint)
+    • mount_placeholder  — generic box-shaped mount (link + fixed joint)
+
+  Usage pattern: keep all geometry numbers in _properties.xacro.
+  Macros only contain structure — no magic numbers.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ═══════════════════════════════════════════════════════
+       INERTIA MACROS
+       ═══════════════════════════════════════════════════════ -->
+
+  <!--
+    box_inertia
+    ───────────
+    Params: m=mass(kg)  x=length  y=width  z=height  (all metres)
+
+    Formulae:
+      Ixx = (1/12)*m*(y²+z²)
+      Iyy = (1/12)*m*(x²+z²)
+      Izz = (1/12)*m*(x²+y²)
+  -->
+  <xacro:macro name="box_inertia" params="m x y z">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${m}"/>
+      <inertia
+        ixx="${(1.0/12.0) * m * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+        iyy="${(1.0/12.0) * m * (x*x + z*z)}" iyz="0.0"
+        izz="${(1.0/12.0) * m * (x*x + y*y)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!--
+    cylinder_inertia
+    ────────────────
+    Params: m=mass(kg)  r=radius  h=height  (all metres)
+    Cylinder rotation axis is Y (wheel convention).
+
+    Formulae (axis along y):
+      Ixx = Izz = (1/12)*m*(3r²+h²)
+      Iyy       = (1/2) *m*r²
+  -->
+  <xacro:macro name="cylinder_inertia" params="m r h">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${m}"/>
+      <inertia
+        ixx="${(1.0/12.0) * m * (3.0*r*r + h*h)}" ixy="0.0" ixz="0.0"
+        iyy="${0.5 * m * r * r}"                   iyz="0.0"
+        izz="${(1.0/12.0) * m * (3.0*r*r + h*h)}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!--
+    sphere_inertia
+    ──────────────
+    Params: m=mass(kg)  r=radius(m)
+
+    Formula: Ixx = Iyy = Izz = (2/5)*m*r²
+  -->
+  <xacro:macro name="sphere_inertia" params="m r">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${m}"/>
+      <inertia
+        ixx="${0.4 * m * r * r}" ixy="0.0" ixz="0.0"
+        iyy="${0.4 * m * r * r}" iyz="0.0"
+        izz="${0.4 * m * r * r}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ═══════════════════════════════════════════════════════
+       DRIVE WHEEL MACRO
+       ═══════════════════════════════════════════════════════ -->
+  <!--
+    drive_wheel
+    ───────────
+    Creates one complete drive wheel: link definition + continuous joint.
+
+    Params:
+      name      — prefix (e.g. "left_wheel", "right_wheel")
+      parent    — parent link name (typically "base_link")
+      y_reflect — +1 for left wheel, -1 for right wheel
+
+    Geometry pulled from _properties.xacro:
+      wheel_radius, wheel_thickness, wheel_mass
+      wheel_joint_y, wheel_joint_z
+  -->
+  <xacro:macro name="drive_wheel" params="name parent y_reflect">
+
+    <link name="${name}_link">
+      <xacro:cylinder_inertia
+        m="${wheel_mass}" r="${wheel_radius}" h="${wheel_thickness}"/>
+
+      <!-- Visual — cylinder rotated to lie along y-axis -->
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_thickness}"/>
+        </geometry>
+        <material name="dark_grey"/>
+      </visual>
+
+      <!-- Collision — same geometry -->
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_thickness}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child  link="${name}_link"/>
+      <origin xyz="0 ${y_reflect * wheel_joint_y} ${wheel_joint_z}"
+              rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <!-- Light damping prevents run-away spinning; mild friction simulates rubber -->
+      <dynamics damping="0.01" friction="0.10"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MOUNT PLACEHOLDER MACRO
+       ═══════════════════════════════════════════════════════ -->
+  <!--
+    mount_placeholder
+    ─────────────────
+    Lightweight box-shaped mount for future sensor/module attachment.
+    All mounts use a fixed joint — kinematics only, no dynamics needed.
+
+    Params:
+      name   — link/joint name prefix
+      parent — parent link
+      x,y,z  — joint origin in parent frame (metres)
+      l,w,h  — box dimensions: length(x), width(y), height(z)
+      mass   — link mass (kg)
+      mat    — material name (from _materials.xacro)
+  -->
+  <xacro:macro name="mount_placeholder" params="name parent x y z l w h mass mat">
+
+    <link name="${name}_link">
+      <xacro:box_inertia m="${mass}" x="${l}" y="${w}" z="${h}"/>
+
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${l} ${w} ${h}"/>
+        </geometry>
+        <material name="${mat}"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${l} ${w} ${h}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_link"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,53 @@
+# gz_bridge.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+# ROS ↔ Gazebo Harmonic topic bridge configuration
+# Used by: ros_gz_bridge/parameter_bridge node in vacuum_bringup/launch/sim.launch.py
+#
+# Direction key:
+#   GZ_TO_ROS  — Gazebo publishes, ROS2 receives
+#   ROS_TO_GZ  — ROS2 publishes, Gazebo receives
+#   BIDIRECTIONAL — both directions
+#
+# Type mapping reference:
+#   gz.msgs.Clock       ↔  rosgraph_msgs/msg/Clock
+#   gz.msgs.Twist       ↔  geometry_msgs/msg/Twist
+#   gz.msgs.Odometry    ↔  nav_msgs/msg/Odometry
+#   gz.msgs.Pose_V      ↔  tf2_msgs/msg/TFMessage
+#   gz.msgs.Model       ↔  sensor_msgs/msg/JointState
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Simulation clock — required for use_sim_time to work in all ROS2 nodes
+- ros_topic_name: "/clock"
+  gz_topic_name:  "/clock"
+  ros_type_name:  "rosgraph_msgs/msg/Clock"
+  gz_type_name:   "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+# Velocity command — sent from ROS2 (teleop / Nav2) to Gazebo DiffDrive plugin
+- ros_topic_name: "/cmd_vel"
+  gz_topic_name:  "/cmd_vel"
+  ros_type_name:  "geometry_msgs/msg/Twist"
+  gz_type_name:   "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+
+# Odometry — published by DiffDrive plugin, received by ROS2 navigation stack
+- ros_topic_name: "/odom"
+  gz_topic_name:  "/odom"
+  ros_type_name:  "nav_msgs/msg/Odometry"
+  gz_type_name:   "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+
+# TF — odom→base_footprint transform from DiffDrive plugin
+- ros_topic_name: "/tf"
+  gz_topic_name:  "/tf"
+  ros_type_name:  "tf2_msgs/msg/TFMessage"
+  gz_type_name:   "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS
+
+# Joint states — wheel angles from JointStatePublisher plugin
+# robot_state_publisher subscribes to /joint_states to compute wheel TF
+- ros_topic_name: "/joint_states"
+  gz_topic_name:  "/joint_states"
+  ros_type_name:  "sensor_msgs/msg/JointState"
+  gz_type_name:   "gz.msgs.Model"
+  direction: GZ_TO_ROS

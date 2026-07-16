@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!--
+  _base.xacro
+  ───────────
+  Defines the robot's two foundation links:
+
+    base_footprint  — virtual link at ground projection (z=0).
+                      No mass, no collision. Required by Nav2 costmap.
+
+    base_link       — physical chassis body. Origin at geometric
+                      centre of the chassis box, elevated above ground.
+
+  TF edge:  base_footprint → base_link  (fixed, z = base_link_z)
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ── base_footprint ─────────────────────────────────────────── -->
+  <!-- Virtual ground-plane reference frame. Zero mass, no collision.
+       Nav2 uses this as the robot's 2D footprint frame. -->
+  <link name="base_footprint"/>
+
+  <!-- Fixed joint lifts base_link to the correct height above ground -->
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child  link="base_link"/>
+    <origin xyz="0.0 0.0 ${base_link_z}" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <!-- ── base_link ──────────────────────────────────────────────── -->
+  <!-- Chassis body: rectangular box representing the robot platform.
+       Origin is at the geometric centre of the box (ROS convention).
+       Inertia computed for a uniform-density rectangular prism. -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${chassis_mass}"/>
+      <inertia
+        ixx="${chassis_ixx}" ixy="0.0" ixz="0.0"
+        iyy="${chassis_iyy}" iyz="0.0"
+        izz="${chassis_izz}"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <material name="light_grey"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+  </link>
+
+</robot>

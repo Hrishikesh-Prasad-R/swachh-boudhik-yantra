@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<!--
+  empty_world.sdf
+  ───────────────
+  Minimal Gazebo Harmonic (Gz 8 / SDF 1.9) world for Stage 1.
+
+  Contains:
+    - Core system plugins (Physics, SceneBroadcaster, UserCommands)
+    - Single directional sun light
+    - Ground plane with realistic friction
+    - Standard gravity
+
+  Deliberately empty of obstacles — use worlds from vacuum_gazebo/worlds/
+  for experiment-specific environments (Stage experiments Phase 1).
+
+  Physics parameters (ODE):
+    step_size  = 0.001 s  →  1000 Hz physics update
+    real_time_factor = 1.0  (real-time simulation)
+-->
+<sdf version="1.9">
+  <world name="vacuum_world">
+
+    <!-- ── Core system plugins ──────────────────────────────────── -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system"
+            name="gz::sim::systems::Contact"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- ── Physics ──────────────────────────────────────────────── -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- ── Gravity ───────────────────────────────────────────────── -->
+    <gravity>0 0 -9.81</gravity>
+
+    <!-- ── Scene ─────────────────────────────────────────────────── -->
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- ── Sun (directional light) ───────────────────────────────── -->
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1.0</intensity>
+    </light>
+
+    <!-- ── Ground plane ──────────────────────────────────────────── -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+              <bullet>
+                <friction>1.0</friction>
+                <friction2>1.0</friction2>
+              </bullet>
+            </friction>
+            <contact>
+              <ode>
+                <kp>1.0e+6</kp>
+                <kd>1.0</kd>
+              </ode>
+            </contact>
+          </surface>
+        </collision>
+
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+          <cast_shadows>false</cast_shadows>
+        </visual>
+
+      </link>
+    </model>
+
+  </world>
+</sdf>

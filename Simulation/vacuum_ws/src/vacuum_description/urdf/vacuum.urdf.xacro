@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  vacuum.urdf.xacro
+  ─────────────────
+  Main entry point for the Swachh Boudhik Yantra robot description.
+
+  This file ONLY includes sub-components — it contains zero geometry.
+  That is intentional: keep each concern in its own file.
+
+  Include order matters:
+    1. _properties  — must be first (all others depend on it)
+    2. _materials   — RViz colours (no dependencies)
+    3. _macros      — reusable macros (depends on properties)
+    4. _base        — base_footprint + base_link
+    5. _wheels      — drive wheels + caster
+    6. _sensors     — mount placeholders
+    7. _gazebo      — Gazebo plugins + friction (must be last)
+
+  To generate the final URDF for inspection:
+    xacro vacuum.urdf.xacro > /tmp/vacuum.urdf
+    check_urdf /tmp/vacuum.urdf
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro"
+       name="vacuum_robot">
+
+  <xacro:include filename="$(find vacuum_description)/urdf/_properties.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_materials.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_macros.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_base.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_wheels.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_sensors.xacro"/>
+  <xacro:include filename="$(find vacuum_description)/urdf/_gazebo.xacro"/>
+
+</robot>

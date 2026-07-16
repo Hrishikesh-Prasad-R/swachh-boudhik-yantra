@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!--
+  _wheels.xacro
+  ─────────────
+  Drive wheel and caster wheel definitions.
+
+  Drive wheels (left/right):
+    Created via the drive_wheel macro from _macros.xacro.
+    Type: continuous joint, axis = y.
+
+  Caster wheel (passive front):
+    Sphere-shaped, fixed joint, mu ≈ 0 (set in _gazebo.xacro).
+    Simplified model — no swivel joint for Stage 1.
+    This is adequate for physics simulation; upgrade in Stage 2 if needed.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ── Left drive wheel  (y = +wheel_joint_y) ────────────────── -->
+  <xacro:drive_wheel name="left_wheel"  parent="base_link" y_reflect="1"/>
+
+  <!-- ── Right drive wheel (y = -wheel_joint_y) ────────────────── -->
+  <xacro:drive_wheel name="right_wheel" parent="base_link" y_reflect="-1"/>
+
+  <!-- ── Caster wheel (passive front support) ───────────────────── -->
+  <link name="caster_wheel_link">
+    <xacro:sphere_inertia m="${caster_mass}" r="${caster_radius}"/>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="${caster_radius}"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="${caster_radius}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Fixed joint: caster does not independently rotate in model.
+       Near-zero friction in _gazebo.xacro handles the free-roll behaviour. -->
+  <joint name="caster_wheel_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="caster_wheel_link"/>
+    <origin xyz="${caster_joint_x} 0.0 ${caster_joint_z}" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+</robot>

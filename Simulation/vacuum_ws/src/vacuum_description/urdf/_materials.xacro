@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!--
+  _materials.xacro
+  ────────────────
+  Material definitions for RViz visualisation.
+  Gazebo material overrides are in _gazebo.xacro.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <material name="black">
+    <color rgba="0.05 0.05 0.05 1.0"/>
+  </material>
+
+  <material name="dark_grey">
+    <color rgba="0.20 0.20 0.20 1.0"/>
+  </material>
+
+  <material name="light_grey">
+    <color rgba="0.70 0.70 0.70 1.0"/>
+  </material>
+
+  <material name="white">
+    <color rgba="0.95 0.95 0.95 1.0"/>
+  </material>
+
+  <material name="blue">
+    <color rgba="0.12 0.40 0.85 1.0"/>
+  </material>
+
+  <material name="yellow">
+    <color rgba="0.95 0.78 0.00 1.0"/>
+  </material>
+
+  <material name="red">
+    <color rgba="0.82 0.10 0.10 1.0"/>
+  </material>
+
+  <material name="orange">
+    <color rgba="1.00 0.50 0.00 1.0"/>
+  </material>
+
+  <material name="green">
+    <color rgba="0.10 0.70 0.20 1.0"/>
+  </material>
+
+</robot>
