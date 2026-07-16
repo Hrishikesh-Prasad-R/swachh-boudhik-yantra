@@ -90,7 +90,9 @@
        z_wheel_world = wheel_radius = 0.033 m
        z_wheel_in_base_link = 0.033 - 0.093 = -0.060 m
        y_wheel = ± wheel_separation/2 = ± 0.134 m
+       x_wheel = drive wheels shifted behind geometric centre = -0.080 m
   -->
+  <xacro:property name="wheel_joint_x"   value="-0.080"/>
   <xacro:property name="wheel_joint_z"   value="-0.060"/>
   <xacro:property name="wheel_joint_y"   value="0.134"/>  <!-- half separation -->
 

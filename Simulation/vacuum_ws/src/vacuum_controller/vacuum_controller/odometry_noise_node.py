@@ -79,7 +79,6 @@ class OdometryNoiseNode(Node):
         noisy_msg.header    = msg.header
         noisy_msg.child_frame_id = msg.child_frame_id
         noisy_msg.twist     = msg.twist
-        noisy_msg.covariance = msg.covariance
 
         if enable_noise:
             # Clone pose and add noise

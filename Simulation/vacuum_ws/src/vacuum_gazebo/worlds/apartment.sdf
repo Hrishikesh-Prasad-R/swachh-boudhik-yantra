@@ -1,0 +1,368 @@
+<?xml version="1.0"?>
+<!--
+  apartment.sdf  —  Stage 4A: Manual Mapping Environment 1
+  ──────────────────────────────────────────────────────────
+  A 6m x 5m apartment room with furniture providing rich visual features
+  for RTAB-Map loop closure and mapping.
+
+  Layout:
+    ┌──────────────────────────────────────────┐
+    │                                          │
+    │  [Bookshelf]    [Coffee Table]           │
+    │                                          │
+    │  [Sofa]                    [Dining Table]│
+    │                                          │
+    │        [TV Stand]                        │
+    │                   [Plant]  [Plant]       │
+    └──────────────────────────────────────────┘
+    (6m wide x 5m deep, origin at centre)
+
+  Textures: all use default material with distinct colours to maximise
+  visual feature density for ORB/SURF descriptors.
+
+  Robot spawn: origin (0, 0, ~0.1m) facing +x (east)
+-->
+<sdf version="1.9">
+  <world name="apartment_world">
+
+    <!-- ── Core system plugins ──────────────────────────────────────────── -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system"
+            name="gz::sim::systems::Contact"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- ── Physics ─────────────────────────────────────────────────────── -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.81</gravity>
+
+    <!-- ── Scene ───────────────────────────────────────────────────────── -->
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.6 0.6 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- ── Lighting (ceiling light + sun) ──────────────────────────────── -->
+    <light name="sun" type="directional">
+      <pose>0 0 5 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.3 0.1 -0.9</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <light name="ceiling_light" type="point">
+      <pose>0 0 3.0 0 0 0</pose>
+      <diffuse>1 0.98 0.9 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>8</range>
+        <constant>0.1</constant>
+        <linear>0.05</linear>
+        <quadratic>0.01</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- ── Ground plane ─────────────────────────────────────────────────── -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.7 0.65 0.5 1</ambient>
+            <diffuse>0.7 0.65 0.5 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         ROOM WALLS  (6m x 5m interior, 3m tall, 0.2m thick walls)
+         Origin at room centre. Wall names: north/south/east/west.
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- North wall (y = +2.5) -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 2.6 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>6.4 0.2 3.0</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>6.4 0.2 3.0</size></box></geometry>
+          <material><ambient>0.9 0.9 0.85 1</ambient><diffuse>0.9 0.9 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall (y = -2.5) -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -2.6 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>6.4 0.2 3.0</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>6.4 0.2 3.0</size></box></geometry>
+          <material><ambient>0.9 0.9 0.85 1</ambient><diffuse>0.9 0.9 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East wall (x = +3.0) -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>3.1 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.2 5.2 3.0</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.2 5.2 3.0</size></box></geometry>
+          <material><ambient>0.88 0.88 0.82 1</ambient><diffuse>0.88 0.88 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West wall (x = -3.0) -->
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-3.1 0 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.2 5.2 3.0</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.2 5.2 3.0</size></box></geometry>
+          <material><ambient>0.88 0.88 0.82 1</ambient><diffuse>0.88 0.88 0.82 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Ceiling -->
+    <model name="ceiling">
+      <static>true</static>
+      <pose>0 0 3.0 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>6.4 5.2 0.05</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>6.4 5.2 0.05</size></box></geometry>
+          <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>0.95 0.95 0.95 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         FURNITURE — provides visual features for RTAB-Map SLAM
+         Each object has a distinct colour for maximum feature diversity.
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Sofa (dark blue/grey, 2.0 x 0.8 x 0.7m) — left side of room -->
+    <model name="sofa">
+      <static>true</static>
+      <pose>-2.2 1.2 0.35 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.0 0.8 0.7</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>2.0 0.8 0.7</size></box></geometry>
+          <material><ambient>0.25 0.28 0.45 1</ambient><diffuse>0.25 0.28 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Sofa backrest -->
+    <model name="sofa_back">
+      <static>true</static>
+      <pose>-2.2 1.55 0.65 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.0 0.1 0.6</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>2.0 0.1 0.6</size></box></geometry>
+          <material><ambient>0.2 0.22 0.38 1</ambient><diffuse>0.2 0.22 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Coffee table (oak brown, 1.0 x 0.5 x 0.42m) -->
+    <model name="coffee_table">
+      <static>true</static>
+      <pose>-1.2 0.3 0.21 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.0 0.5 0.42</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.0 0.5 0.42</size></box></geometry>
+          <material><ambient>0.55 0.37 0.18 1</ambient><diffuse>0.55 0.37 0.18 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- TV stand (dark espresso, 1.5 x 0.4 x 0.5m) — south wall -->
+    <model name="tv_stand">
+      <static>true</static>
+      <pose>0.3 -2.2 0.25 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.5 0.4 0.5</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.5 0.4 0.5</size></box></geometry>
+          <material><ambient>0.15 0.10 0.07 1</ambient><diffuse>0.15 0.10 0.07 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- TV (thin black rectangle, 0.9 x 0.05 x 0.55m) on TV stand -->
+    <model name="tv">
+      <static>true</static>
+      <pose>0.3 -2.15 0.775 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.9 0.05 0.55</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.9 0.05 0.55</size></box></geometry>
+          <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dining table (white/birch, 1.2 x 0.8 x 0.75m) — east side -->
+    <model name="dining_table">
+      <static>true</static>
+      <pose>2.0 0.0 0.375 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>1.2 0.8 0.75</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>1.2 0.8 0.75</size></box></geometry>
+          <material><ambient>0.92 0.88 0.80 1</ambient><diffuse>0.92 0.88 0.80 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dining chair 1 -->
+    <model name="chair_1">
+      <static>true</static>
+      <pose>2.0 0.7 0.45 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.45 0.45 0.9</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+          <material><ambient>0.65 0.35 0.20 1</ambient><diffuse>0.65 0.35 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dining chair 2 -->
+    <model name="chair_2">
+      <static>true</static>
+      <pose>2.0 -0.7 0.45 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.45 0.45 0.9</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.45 0.45 0.9</size></box></geometry>
+          <material><ambient>0.65 0.35 0.20 1</ambient><diffuse>0.65 0.35 0.20 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Bookshelf (tall, white, 0.8 x 0.3 x 1.8m) — north-west corner -->
+    <model name="bookshelf">
+      <static>true</static>
+      <pose>-2.7 2.1 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.8 0.3 1.8</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.8 0.3 1.8</size></box></geometry>
+          <material><ambient>0.92 0.92 0.92 1</ambient><diffuse>0.92 0.92 0.92 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Books on shelf (colour blocks — improves visual features) -->
+    <model name="books_row1">
+      <static>true</static>
+      <pose>-2.7 1.97 0.4 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.75 0.05 0.25</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.75 0.05 0.25</size></box></geometry>
+          <material><ambient>0.8 0.15 0.1 1</ambient><diffuse>0.8 0.15 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="books_row2">
+      <static>true</static>
+      <pose>-2.7 1.97 0.9 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.75 0.05 0.25</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.75 0.05 0.25</size></box></geometry>
+          <material><ambient>0.1 0.3 0.8 1</ambient><diffuse>0.1 0.3 0.8 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Plant 1 (green cylinder, tall) -->
+    <model name="plant_1">
+      <static>true</static>
+      <pose>2.7 -2.0 0.6 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><cylinder><radius>0.15</radius><length>1.2</length></cylinder></geometry></collision>
+        <visual name="vis">
+          <geometry><cylinder><radius>0.15</radius><length>1.2</length></cylinder></geometry>
+          <material><ambient>0.1 0.55 0.1 1</ambient><diffuse>0.1 0.55 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Plant 2 (smaller, round pot) -->
+    <model name="plant_2">
+      <static>true</static>
+      <pose>2.3 -2.0 0.3 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><sphere><radius>0.2</radius></sphere></geometry></collision>
+        <visual name="vis">
+          <geometry><sphere><radius>0.2</radius></sphere></geometry>
+          <material><ambient>0.15 0.6 0.15 1</ambient><diffuse>0.15 0.6 0.15 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Rug on floor (flat box, different floor colour for visual feature) -->
+    <model name="rug">
+      <static>true</static>
+      <pose>-0.5 0.5 0.01 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>2.0 1.5 0.02</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>2.0 1.5 0.02</size></box></geometry>
+          <material><ambient>0.55 0.1 0.1 1</ambient><diffuse>0.55 0.1 0.1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Wall art / picture (adds visual feature on north wall) -->
+    <model name="wall_art_north">
+      <static>true</static>
+      <pose>1.5 2.55 1.5 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>0.6 0.02 0.4</size></box></geometry></collision>
+        <visual name="vis">
+          <geometry><box><size>0.6 0.02 0.4</size></box></geometry>
+          <material><ambient>0.2 0.5 0.7 1</ambient><diffuse>0.2 0.5 0.7 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

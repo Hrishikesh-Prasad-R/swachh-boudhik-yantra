@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!--
+  vacuum_slam/package.xml
+  ───────────────────────
+  Stage 4A — Manual RTAB-Map Mapping
+
+  This package contains:
+    - RTAB-Map launch files (slam.launch.py, localization.launch.py)
+    - RTAB-Map parameter YAML (rtabmap.yaml)
+    - RViz configuration for SLAM visualisation (slam_rviz.rviz)
+
+  Depends on rtabmap_ros (ros-jazzy-rtabmap-ros).
+  Install with:
+    sudo apt-get install -y ros-jazzy-rtabmap-ros
+-->
+<package format="3">
+  <name>vacuum_slam</name>
+  <version>0.4.0</version>
+  <description>
+    Stage 4A: Intel D435i RGB-D SLAM using RTAB-Map.
+    Manual keyboard-teleop mapping with occupancy grid, 3D point cloud map,
+    loop closure, trajectory recording, and map save/load.
+  </description>
+
+  <maintainer email="robot@vacuumbot.local">Swachh Boudhik Yantra</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- RTAB-Map ROS2 wrapper -->
+  <exec_depend>rtabmap_ros</exec_depend>
+
+  <!-- Launch infrastructure -->
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Visualisation -->
+  <exec_depend>rviz2</exec_depend>
+
+  <!-- Teleop (optional, for manual driving during mapping) -->
+  <exec_depend>teleop_twist_keyboard</exec_depend>
+
+  <!-- Data recording -->
+  <exec_depend>ros2bag</exec_depend>
+  <exec_depend>rosbag2_transport</exec_depend>
+
+  <!-- Map saving (2D PNG/YAML) -->
+  <exec_depend>nav2_map_server</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

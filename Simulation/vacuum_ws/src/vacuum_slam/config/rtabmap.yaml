@@ -1,0 +1,128 @@
+# rtabmap.yaml  —  Stage 4A: Manual RTAB-Map Mapping
+# ─────────────────────────────────────────────────────────────────────────────
+# RTAB-Map parameters for indoor RGB-D mapping with wheel odometry.
+# All major parameters are documented with their purpose and trade-offs.
+#
+# Reference:
+#   http://wiki.ros.org/rtabmap_ros/Tutorials/SetupOnYourRobot
+#   http://official-rtab-map-forum.67519.x6.nabble.com/
+#
+# Tuning guide:
+#   - For larger environments: increase Mem/STMSize
+#   - For faster CPU:          increase Kp/MaxFeatures
+#   - For better loop closure: decrease Rtabmap/LoopThr
+#   - For smaller map files:   decrease Grid/CellSize (but increases RAM)
+#
+# Usage:
+#   ros2 launch vacuum_slam slam.launch.py
+#   ros2 launch vacuum_slam slam.launch.py environment:=office
+# ─────────────────────────────────────────────────────────────────────────────
+
+rtabmap:
+  ros__parameters:
+
+    # ── Frame IDs ──────────────────────────────────────────────────────────
+    # Must match the TF tree from vacuum_description/_sensors.xacro
+    frame_id:             base_footprint    # robot base frame (ground plane)
+    odom_frame_id:        odom              # published by diff_drive_controller
+    map_frame_id:         map               # RTAB-Map publishes map -> odom TF
+    sensor_transform:     ""               # use TF (camera_link auto-detected)
+
+    # ── Input mode ─────────────────────────────────────────────────────────
+    subscribe_depth:      true
+    subscribe_rgb:        true
+    subscribe_rgbd:       false
+    subscribe_scan:       false
+    subscribe_scan_cloud: false
+    subscribe_odom_info:  false
+
+    # ── Synchronisation ────────────────────────────────────────────────────
+    # approx_sync: allows small timestamp differences between RGB and depth.
+    # Required for simulation because Gazebo bridge may introduce minor jitter.
+    approx_sync:              true
+    approx_sync_max_interval: 0.02   # seconds — max RGB/depth time difference
+
+    # Queue size: increase if dropping frames (at cost of RAM)
+    queue_size: 10
+
+    # ── Database ───────────────────────────────────────────────────────────
+    # RTAB-Map persists its map to an SQLite database.
+    # Default: ~/.ros/rtabmap.db (overridden per-launch via argument)
+    database_path: ~/.ros/rtabmap.db
+
+    # ── Memory management ──────────────────────────────────────────────────
+    # Short-term memory (STM) holds the most recent keyframes.
+    # Older keyframes are moved to long-term memory (LTM) for loop closure.
+    Mem/STMSize:               "30"     # keyframes in short-term memory
+    Mem/RehearsalSimilarity:   "0.45"   # similarity threshold for memory rehearsal
+    Mem/BadSignaturesIgnored:  "false"  # keep poor-quality keyframes
+    Mem/InitWMWithAllNodes:    "false"  # don't pre-load entire DB into working memory
+    Mem/IncrementalMemory:     "true"   # add new keyframes continuously
+
+    # ── Detection rate ─────────────────────────────────────────────────────
+    # 1 Hz = RTAB-Map processes one keyframe per second (sufficient for walking pace)
+    # Increase to 2 Hz if the robot moves fast or the environment changes rapidly.
+    Rtabmap/DetectionRate:     "1"      # Hz — how often RTAB-Map updates the map
+    Rtabmap/TimeThr:           "0"      # ms — 0 = no time limit per update
+    Rtabmap/MemoryThr:         "0"      # MB — 0 = no memory limit
+
+    # ── Loop closure ───────────────────────────────────────────────────────
+    # Threshold for accepting a loop closure hypothesis.
+    # Lower = more aggressive (more false positives risk).
+    # Higher = more conservative (may miss valid loop closures).
+    Rtabmap/LoopThr:           "0.11"   # loop closure acceptance threshold
+    Rtabmap/LoopRatio:         "0"      # 0 = accept all hypotheses above LoopThr
+
+    # Feature extraction for loop closure
+    RGBD/LoopClosureReextractFeatures: "false"
+
+    # ── Motion update thresholds ───────────────────────────────────────────
+    # Only create a new keyframe when the robot has moved sufficiently.
+    # Smaller values = more keyframes = better coverage, more RAM/CPU.
+    RGBD/LinearUpdate:         "0.1"    # m  — min translation to create new keyframe
+    RGBD/AngularUpdate:        "0.087"  # rad — min rotation (= ~5 degrees)
+
+    # ── Feature detection ──────────────────────────────────────────────────
+    # ORB (6) is recommended for real-time use (faster than SURF/SIFT).
+    # For better quality at cost of CPU: use SURF (0) or AKAZE (7).
+    Kp/DetectorStrategy:       "6"      # 0=SURF, 6=ORB, 7=AKAZE, 8=FAST/BRIEF
+    Kp/MaxFeatures:            "500"    # max keypoints per image
+    Kp/MaxDepth:               "4.0"    # m — ignore features beyond this depth
+    Kp/MinDepth:               "0.1"    # m — ignore features closer than this
+
+    # ── Occupancy grid (2D map) ────────────────────────────────────────────
+    # Used by Nav2 in Stage 5.
+    Grid/3D:                   "false"  # false = 2D occupancy grid for Nav2
+    Grid/RayTracing:           "true"   # mark free space using ray casting
+    Grid/CellSize:             "0.05"   # m — 5cm resolution (standard for Nav2)
+    Grid/MaxObstacleHeight:    "2.0"    # m — ignore obstacles above this height
+    Grid/MinGroundHeight:      "-0.1"   # m — ignore points below ground
+    Grid/MaxGroundHeight:      "0.15"   # m — classify points below as ground
+    Grid/FlatObstacleDetected: "true"   # detect horizontal surfaces as obstacles
+    Grid/NormalsSegmentation:  "false"  # disable normals-based floor detection
+
+    # ── Visual odometry fallback ───────────────────────────────────────────
+    # RTAB-Map can refine odometry using visual features.
+    # We use wheel odometry as primary; visual is cross-check only.
+    Vis/MinInliers:            "15"     # min visual feature matches for a valid frame
+    Vis/InlierDistance:        "0.1"    # m — max reprojection error for inliers
+
+    # ── ICP refinement (disabled — no lidar) ──────────────────────────────
+    Icp/MaxTranslation:        "0.1"
+    Icp/MaxRotation:           "0.1"
+
+    # ── Publishing ─────────────────────────────────────────────────────────
+    # These control what RTAB-Map publishes to ROS2 topics.
+    RGBD/CreateOccupancyGrid:  "true"   # publish /rtabmap/map (OccupancyGrid)
+    RGBD/ProximityBySpace:     "true"   # detect nearby previous locations
+    RGBD/ProximityMaxGraphDepth: "0"
+
+    # ── Logging ────────────────────────────────────────────────────────────
+    Rtabmap/StartNewMapOnLoopClosure: "false"
+    Rtabmap/SaveWMState:       "false"
+
+    # ── Odometry noise tolerance ───────────────────────────────────────────
+    # Helps RTAB-Map handle the Gaussian noise we inject in Stage 2.
+    Odom/Strategy:             "0"      # 0=Frame-to-Map, 1=Frame-to-Frame
+    Odom/ResetCountdown:       "1"
+    OdomF2M/MaxSize:           "1000"   # max points in the local map

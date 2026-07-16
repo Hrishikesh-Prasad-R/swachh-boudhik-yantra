@@ -34,7 +34,7 @@
 
 # ── D435i Colour Image ────────────────────────────────────────────────────────
 - ros_topic_name: "/camera/color/image_raw"
-  gz_topic_name:  "/camera/image_raw"
+  gz_topic_name:  "/camera/image_raw/image"
   ros_type_name:  "sensor_msgs/msg/Image"
   gz_type_name:   "gz.msgs.Image"
   direction: GZ_TO_ROS
@@ -68,4 +68,15 @@
   gz_topic_name:  "/camera/image_raw/points"
   ros_type_name:  "sensor_msgs/msg/PointCloud2"
   gz_type_name:   "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS
+
+# ── Ground Truth Pose (Stage 4A — ATE/RPE evaluation) ────────────────────────
+# Bridges the Gazebo model pose to /ground_truth/pose for comparison with
+# /rtabmap/odom in evaluate_trajectory.py.
+# Topic: /world/vacuum_world/pose/info publishes ALL model poses.
+# Filtered to vacuum_robot in the evaluation script.
+- ros_topic_name: "/ground_truth/poses"
+  gz_topic_name:  "/world/vacuum_world/pose/info"
+  ros_type_name:  "tf2_msgs/msg/TFMessage"
+  gz_type_name:   "gz.msgs.Pose_V"
   direction: GZ_TO_ROS

@@ -285,7 +285,7 @@ class StaticGraphGenerator:
 
     INTERNAL_PKGS = {
         'vacuum_bringup', 'vacuum_controller', 'vacuum_description',
-        'vacuum_gazebo', 'vacuum_interfaces', 'vacuum_utils'
+        'vacuum_gazebo', 'vacuum_interfaces', 'vacuum_slam', 'vacuum_utils'
     }
 
     def generate_all(self, data: dict) -> dict:
@@ -319,6 +319,7 @@ class StaticGraphGenerator:
         lines.append('    style vacuum_description fill:#9B59B6,color:#fff')
         lines.append('    style vacuum_gazebo     fill:#E67E22,color:#fff')
         lines.append('    style vacuum_interfaces fill:#1ABC9C,color:#fff')
+        lines.append('    style vacuum_slam       fill:#F39C12,color:#fff')
         lines.append('    style vacuum_utils      fill:#E74C3C,color:#fff')
         lines.append('```')
         return '\n'.join(lines)
@@ -326,69 +327,122 @@ class StaticGraphGenerator:
     def _dataflow_graph(self, data: dict) -> str:
         return '''```mermaid
 graph LR
-    %% ROS2 Topic Data-Flow — Stage 2
+    %% ROS2 Topic Data-Flow — Stage 3 & 4A
 
-    KB(["🎹 Keyboard\nTeleop"]) -->|/cmd_vel| DDC
-    NAV2(["🧭 Nav2\nFuture Stage 5"]) -.->|/cmd_vel| DDC
-
-    subgraph ros2_control ["ros2_control Stack"]
-        DDC["diff_drive_controller\n/cmd_vel subscriber"]
-        JSB["joint_state_broadcaster"]
-        CM["controller_manager\n/controller_manager"]
+    subgraph UserI ["User Input & Teleop"]
+        KB(["🎹 Keyboard Teleop"])
     end
 
-    DDC -->|velocity cmds\nrad/s| HW["gz_ros2_control\nGazeboSimSystem"]
-    HW -->|joint pos/vel| SIM["Gazebo\nPhysics"]
-    SIM -->|joint states| HW
-    HW -->|encoder feedback| DDC
-    HW -->|joint states| JSB
+    subgraph Simulation ["Gazebo Harmonic Simulation"]
+        GZ_CLK["Gazebo Clock"]
+        GZ_CAM["D435i RGBD Sensor Plugin"]
+        GZ_CTRL["gz_ros2_control Plugin"]
+    end
 
-    DDC -->|/odom| ODOM(["📍 /odom\nnav_msgs/Odometry"])
-    DDC -->|/tf odom→base_footprint| TF(["🌐 /tf"])
-    JSB -->|/joint_states| JS(["⚙️  /joint_states\nsensor_msgs/JointState"])
+    subgraph Bridge ["ros_gz_bridge (parameter_bridge)"]
+        CLK_B["/clock Bridge"]
+        CAM_B["Camera Bridges\n(5 topics)"]
+        GT_B["/ground_truth/poses Bridge"]
+    end
 
-    RSP["robot_state_publisher"] -->|/robot_description| GZ["Gazebo spawn"]
-    RSP -->|/tf static\nfixed joints| TF
-    JS --> RSP
+    subgraph Controllers ["vacuum_controller Package"]
+        DDC["diff_drive_controller"]
+        JSB["joint_state_broadcaster"]
+        NOISE["odometry_noise_node"]
+        M_DIAG["motion_diagnostics_node"]
+        C_DIAG["camera_diagnostics_node"]
+    end
 
-    GZ_CLK["Gazebo Clock"] -->|gz bridge| CLK(["🕐 /clock"])
-    CLK -->|use_sim_time| DDC
-    CLK -->|use_sim_time| RSP
+    subgraph SLAM ["vacuum_slam Package"]
+        RTAB["rtabmap Node"]
+    end
 
-    ODOM --> ODN["odometry_noise_node\n(optional)"]
-    ODN -->|/odom_noisy| NOISYTOPIC(["📊 /odom_noisy"])
+    %% Clock connections
+    GZ_CLK -->|gz.msgs.Clock| CLK_B
+    CLK_B -->|/clock| DDC
+    CLK_B -->|/clock| RTAB
+    CLK_B -->|/clock| C_DIAG
 
-    ODOM --> MDN["motion_diagnostics_node"]
-    JS --> MDN
-    DDC -->|cmd tracking| MDN
-    MDN -->|/motion_diagnostics| DIAG(["🔍 /motion_diagnostics"])
+    %% Teleop
+    KB -->|/cmd_vel| DDC
+
+    %% ros2_control loop
+    DDC -->|joint velocities| GZ_CTRL
+    GZ_CTRL -->|joint states| JSB
+    JSB -->|/joint_states| M_DIAG
+
+    %% Camera dataflow (Stage 3)
+    GZ_CAM -->|gz.msgs.Image / PointCloudPacked| CAM_B
+    CAM_B -->|/camera/color/image_raw| RTAB
+    CAM_B -->|/camera/color/image_raw| C_DIAG
+    CAM_B -->|/camera/depth/image_rect_raw| RTAB
+    CAM_B -->|/camera/depth/image_rect_raw| C_DIAG
+    CAM_B -->|/camera/depth/points| RTAB
+    CAM_B -->|/camera/depth/points| C_DIAG
+    CAM_B -->|/camera/color/camera_info| RTAB
+    CAM_B -->|/camera/depth/camera_info| RTAB
+
+    %% Odometry / TF
+    DDC -->|/odom| NOISE
+    DDC -->|/odom| RTAB
+    DDC -->|/odom| M_DIAG
+    DDC -->|/tf (odom->base_footprint)| RTAB
+    NOISE -->|/odom_noisy| NOISY_ODOM(["📊 /odom_noisy"])
+
+    %% Diagnostics
+    M_DIAG -->|/motion_diagnostics| DIAG_TOPIC(["🔍 /diagnostics"])
+    C_DIAG -->|/camera/diagnostics| DIAG_TOPIC
+
+    %% SLAM Outputs (Stage 4A)
+    RTAB -->|/rtabmap/map| MAP_2D(["🗺️  /rtabmap/map\n(OccupancyGrid)"])
+    RTAB -->|/rtabmap/cloud_map| MAP_3D(["☁️  /rtabmap/cloud_map\n(PointCloud2)"])
+    RTAB -->|/rtabmap/odom| EVAL(["evaluate_trajectory.py\n(evo benchmark)"])
+
+    %% Ground Truth Pose (Stage 4A)
+    GZ_CTRL -->|gz.msgs.Pose_V| GT_B
+    GT_B -->|/ground_truth/poses| EVAL
 ```'''
 
     def _tf_tree(self) -> str:
         return '''```mermaid
 graph TD
-    %% TF Tree — Swachh Boudhik Yantra (Stage 2)
-    WORLD(["world\n\"static origin\""])
+    %% TF Tree — Swachh Boudhik Yantra (Stage 3 & 4A)
+    MAP(["map\npublished by rtabmap"])
     ODOM["odom\npublished by diff_drive_controller"]
     BF["base_footprint\nground contact plane"]
     BL["base_link\nrobot chassis CoM"]
     LW["left_wheel_link"]
     RW["right_wheel_link"]
     CW["caster_wheel_link"]
-    CAM["camera_mount_link\nD435i placeholder"]
+
+    CAM_M["camera_mount_link\nchassis bracket"]
+    CAM_L["camera_link\nD435i physical centre"]
+    CAM_CF["camera_color_frame"]
+    CAM_CO["camera_color_optical_frame\n(z-forward, x-right, y-down)"]
+    CAM_DF["camera_depth_frame"]
+    CAM_DO["camera_depth_optical_frame\n(z-forward, x-right, y-down)"]
+
     ARM["arm_mount_link\nArm placeholder"]
     VAC["vacuum_mount_link\nVacuum placeholder"]
 
-    WORLD -->|static| ODOM
-    ODOM -->|dynamic\ndiff_drive_controller| BF
+    MAP -->|dynamic| ODOM
+    ODOM -->|dynamic| BF
     BF -->|fixed| BL
     BL -->|continuous| LW
     BL -->|continuous| RW
     BL -->|fixed| CW
-    BL -->|fixed| CAM
+    BL -->|fixed| CAM_M
     BL -->|fixed| ARM
     BL -->|fixed| VAC
 
+    %% D435i Camera TF Chain (Stage 3)
+    CAM_M -->|fixed| CAM_L
+    CAM_L -->|fixed| CAM_CF
+    CAM_CF -->|fixed (rpy=-pi/2,0,-pi/2)| CAM_CO
+    CAM_L -->|fixed| CAM_DF
+    CAM_DF -->|fixed (rpy=-pi/2,0,-pi/2)| CAM_DO
+
+    style MAP fill:#F39C12,color:#fff
     style ODOM fill:#4A90D9,color:#fff
     style BF fill:#7ED321,color:#fff
     style BL fill:#9B59B6,color:#fff
@@ -403,77 +457,92 @@ sequenceDiagram
     participant GZ as Gazebo Harmonic
     participant BR as ros_gz_bridge
     participant GZC as gz_ros2_control
-    participant JSB as JSB spawner
-    participant DDC as DDC spawner
+    participant CTRL as controllers.launch.py
+    participant DIAG as camera_diagnostics_node
+    participant SLAM as slam.launch.py
+    participant RTAB as rtabmap Node
 
-    U->>SL: ros2 launch vacuum_bringup sim.launch.py
-    SL->>RSP: start (parse URDF, publish /robot_description)
-    SL->>GZ: start Gazebo (-r empty_world.sdf)
-    SL->>BR: start bridge (/clock only)
-    note over GZ: t=0s physics running
+    U->>SL: ros2 launch vacuum_bringup sim.launch.py world:=apartment
+    SL->>RSP: start (parse URDF with camera link, publish /robot_description)
+    SL->>GZ: start Gazebo (loads apartment.sdf world)
+    SL->>BR: start bridge (/clock + 5 camera topics)
+    note over GZ: t=0s physics & Ogre2 renderer active
 
     note over SL: TimerAction delay 3s
-    SL->>GZ: spawn vacuum_robot (from /robot_description)
-    GZ->>GZC: load gz_ros2_control plugin
-    GZC-->>SL: /controller_manager ready
-    note over GZ,GZC: t=3s robot in simulation
+    SL->>GZ: spawn vacuum_robot (loads rgbd_camera sensor)
+    GZ->>GZC: init gz_ros2_control plugin
+    note over GZ,GZC: t=3s robot spawned, camera rendering active
 
-    note over SL: TimerAction delay 5s
-    SL->>JSB: spawner joint_state_broadcaster
-    JSB-->>GZC: activate → /joint_states
-    note over JSB: t=5s JSB [active]
+    note over SL: Include controllers launch
+    SL->>CTRL: load controllers.launch.py
 
-    note over SL: TimerAction delay 6s
-    SL->>DDC: spawner diff_drive_controller
-    DDC-->>GZC: activate → /odom /tf
-    note over DDC: t=6s DDC [active]
+    note over CTRL: TimerAction delay 5s
+    CTRL->>GZC: spawn joint_state_broadcaster → /joint_states active (t=5s)
 
-    note over SL: TimerAction delay 7s
-    SL->>SL: start cmd_vel relay
-    note over SL: t=7s /cmd_vel active
+    note over CTRL: TimerAction delay 6s
+    CTRL->>GZC: spawn diff_drive_controller → /odom, /tf active (t=6s)
 
-    note over SL: TimerAction delay 8s
-    SL->>SL: OdometryNoiseNode + MotionDiagnosticsNode
-    note over SL: t=8s fully operational
+    note over CTRL: TimerAction delay 8s
+    CTRL->>CTRL: start odometry_noise_node + motion_diagnostics_node (t=8s)
+
+    note over CTRL: TimerAction delay 10s
+    CTRL->>DIAG: start camera_diagnostics_node (t=10s)
+    note over DIAG: Monitors camera FPS & latency
+
+    %% SLAM activation (Stage 4A)
+    U->>SLAM: ros2 launch vacuum_slam slam.launch.py environment:=apartment
+    SLAM->>RTAB: start rtabmap node (loads rtabmap.yaml parameters)
+    RTAB->>RTAB: Wipes old database, begins mapping
+    note over RTAB: Mapping & loop closures active
 ```'''
 
     def _controller_arch(self) -> str:
         return '''```mermaid
 graph TD
-    %% ros2_control Architecture — Stage 2
+    %% ros2_control & SLAM Integration Architecture — Stage 3 & 4A
 
-    KB(["Keyboard / Nav2"])
+    KB(["Keyboard Teleop"])
     CMD(["📨 /cmd_vel\ngeometry_msgs/Twist"])
-    DDC["diff_drive_controller\nvelocity limiter + odometry"]
+    DDC["diff_drive_controller\n(velocity limiters + wheel odom)"]
     HW["Hardware Interface\ngz_ros2_control/GazeboSimSystem"]
-    LJ["left_wheel_joint\nvelocity command"]
-    RJ["right_wheel_joint\nvelocity command"]
-    SIM["Gazebo Physics\njoint simulation"]
-    ENC["Joint State Feedback\nposition + velocity"]
+    SIM["Gazebo Physics\n(differential joint drive)"]
+    ENC["Joint Encoder Feedback\n(angular pos/vel)"]
     JSB["joint_state_broadcaster"]
     JS(["📊 /joint_states"])
     RSP["robot_state_publisher"]
     ODOM(["📍 /odom\nnav_msgs/Odometry"])
-    TF(["🌐 /tf\nodom→base_footprint"])
+    TF_ODOM(["🌐 TF: odom → base_footprint"])
+
+    CAM_GZ["D435i Sensor Plugin\n(ideal/realistic depth model)"]
+    CAM_DATA(["📷 RGBD Streams & TF\ncolor/image, depth/image, points"])
+    RTAB["rtabmap Node\n(visual loop-closure mapping)"]
+    TF_MAP(["🌐 TF: map → odom"])
 
     KB --> CMD
     CMD --> DDC
-    DDC -->|"velocity cmds (rad/s)"| HW
-    HW --> LJ
-    HW --> RJ
-    LJ --> SIM
-    RJ --> SIM
-    SIM -->|encoder positions| ENC
-    ENC -->|position/velocity| HW
+    DDC -->|"wheel velocity commands"| HW
+    HW --> SIM
+    SIM --> ENC
+    ENC --> HW
     HW --> JSB
     JSB --> JS
     JS --> RSP
-    HW -->|odometry integration| DDC
+
+    HW -->|odom integration| DDC
     DDC --> ODOM
-    DDC --> TF
+    DDC --> TF_ODOM
+
+    %% Perception-Mapping data flow
+    SIM -->|visual renderer| CAM_GZ
+    CAM_GZ --> CAM_DATA
+    CAM_DATA --> RTAB
+    ODOM --> RTAB
+    TF_ODOM --> RTAB
+    RTAB --> TF_MAP
 
     style DDC fill:#4A90D9,color:#fff
     style HW fill:#E67E22,color:#fff
+    style RTAB fill:#F39C12,color:#fff
     style SIM fill:#7ED321,color:#fff
 ```'''
 
@@ -482,10 +551,11 @@ graph TD
         purpose = {
             'vacuum_bringup':     'Master launch orchestration (sim.launch.py + RViz)',
             'vacuum_controller':  'ros2_control config, diff drive, noise & diagnostics nodes',
-            'vacuum_description': 'Xacro URDF robot model (8 links, 7 joints)',
-            'vacuum_gazebo':      'Gazebo world, SDF, /clock bridge config',
-            'vacuum_interfaces':  'Future custom msgs/srvs/actions (empty Stage 2)',
-            'vacuum_utils':       'Validation scripts, TF checker, graphify, metrics logger',
+            'vacuum_description': 'Xacro URDF robot model (13 links, 12 joints including D435i camera)',
+            'vacuum_gazebo':      'Gazebo world, SDF, /clock and D435i bridge config',
+            'vacuum_interfaces':  'Future custom msgs/srvs/actions (empty Stage 4)',
+            'vacuum_slam':        'RTAB-Map SLAM node, map_saver configuration, and slam_rviz settings',
+            'vacuum_utils':       'Validation scripts, TF checker, graphify, metrics logger, and trajectory/SLAM benchmark tools',
         }
         lines = []
         lines.append('### Stages Complete')
@@ -493,8 +563,9 @@ graph TD
         lines.append('|-------|--------|-------------|')
         lines.append('| Stage 1 | ✅ `v0.1-stage1-foundation` | Robot URDF, Gazebo world, TF tree |')
         lines.append('| Stage 2 | ✅ `v0.2-stage2-ros2control` | ros2_control, diff_drive, odometry |')
-        lines.append('| Stage 3 | ⏳ Pending | D435i RGB-D + EKF localization |')
-        lines.append('| Stage 4 | ⏳ Pending | RTABMap SLAM |')
+        lines.append('| Stage 3 | ✅ `v0.3-stage3-perception` | D435i RGB-D Integration, Diagnostics, Validation |')
+        lines.append('| Stage 4A | 🛠️  Active | Manual RTAB-Map Mapping, Evaluation & Benchmarks |')
+        lines.append('| Stage 4B | ⏳ Pending | Autonomous Frontier Exploration |')
         lines.append('| Stage 5 | ⏳ Pending | Nav2 navigation |')
         lines.append('| Stages 6–10 | ⏳ Pending | Coverage, Arm, Transfer, Deploy |')
         lines.append('')
@@ -505,30 +576,27 @@ graph TD
             lines.append(f'| `{p["name"]}` | {purpose.get(p["name"], p["description"][:60])} |')
         lines.append('')
         lines.append('### Key Design Decisions')
-        lines.append('- **gz_ros2_control** replaces gz DiffDrive plugin → same controller runs on Jetson')
-        lines.append('- **ParameterValue(value_type=str)** required in ROS2 Jazzy for URDF launch params')
-        lines.append('- **Bridge reduced to /clock only** — all robot topics native ROS2 (Stage 2)')
-        lines.append('- **Modular Xacro** — 8 files, each with single responsibility')
-        lines.append('- **No hardcoded values** — all params in YAML (controllers.yaml, _properties.xacro)')
+        lines.append('- **gz_ros2_control**: inserts ros2_control abstraction layer, easing transition to Orin hardware.')
+        lines.append('- **D435i RealSense Frame Convention**: links & joints follow REP-103 and RealSense SDK standards.')
+        lines.append('- **Delayed Camera Diagnostics Node**: starts 10 seconds after simulation to allow Gazebo camera bridge stabilization.')
+        lines.append('- **Dual Noise Modes**: supports both ideal (clean mapping) and realistic (noise validation) modes inside camera.yaml.')
+        lines.append('- **unprivileged bwrap/python3.12 overrides**: launch python nodes via python3.12 explicitly to prevent python3.14 import errors.')
         lines.append('')
-        lines.append('### Not Yet Implemented (Stages 3–10)')
-        lines.append('- D435i RGB-D camera driver (realsense2_camera)')
-        lines.append('- EKF sensor fusion (robot_localization)')
-        lines.append('- RTABMap SLAM')
-        lines.append('- Nav2 stack (costmaps, planners, behaviours)')
-        lines.append('- Coverage planner')
-        lines.append('- MoveIt2 robotic arm')
+        lines.append('### Not Yet Implemented (Stages 4B–10)')
+        lines.append('- Autonomous frontier exploration planning')
+        lines.append('- Nav2 stack (costmaps, planners, recovery behaviors)')
+        lines.append('- Coverage planner algorithm')
+        lines.append('- MoveIt2 robotic arm manipulation')
         lines.append('- Jetson Orin Nano hardware deployment')
         lines.append('- Real-world to simulation transfer validation')
         lines.append('')
-        lines.append('### Stage 3 Critical Path')
-        lines.append('1. `sudo apt-get install ros-jazzy-realsense2-camera`')
-        lines.append('2. Add D435i URDF link to `_sensors.xacro`')
-        lines.append('3. Add RealSense Gazebo plugin')
-        lines.append('4. Launch `realsense2_camera` node')
-        lines.append('5. Install & configure `robot_localization` EKF (odom + IMU → /odom_filtered)')
-        lines.append('6. Validate: `ros2 topic hz /camera/color/image_raw /camera/depth/image_rect_raw`')
+        lines.append('### Stage 4B Critical Path')
+        lines.append('1. Complete manual mapping evaluation across Room, Office, Corridor, Apartment worlds.')
+        lines.append('2. Record bags and verify ATE/RPE trajectory error metrics using `evo`.')
+        lines.append('3. Implement Frontier Exploration algorithm node and Behavior Trees.')
+        lines.append('4. Integrate Frontier planner with Nav2 local/global navigation.')
         return '\n'.join(lines)
+
 
 
 # ── Section Parser ───────────────────────────────────────────────────────────
@@ -654,10 +722,17 @@ def main():
 
     api_key = os.getenv('GEMINI_API_KEY', '')
     if not api_key:
-        print('[ERROR] GEMINI_API_KEY not set.')
-        sys.exit(1)
-    masked = api_key[:8] + '...' + '*' * 16
-    print(f'[env] Key: {masked}')
+        if args.no_ai:
+            api_key = 'STATIC_MODE'
+        else:
+            print('[ERROR] GEMINI_API_KEY not set.')
+            sys.exit(1)
+    
+    if api_key != 'STATIC_MODE':
+        masked = api_key[:8] + '...' + '*' * 16
+        print(f'[env] Key: {masked}')
+    else:
+        print('[env] Key: None (Static Mode)')
 
     output_dir = Path(args.output).resolve() if args.output else ws_root / 'graphify_output'
 

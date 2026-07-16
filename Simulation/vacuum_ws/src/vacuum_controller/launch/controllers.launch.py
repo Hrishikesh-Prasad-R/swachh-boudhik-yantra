@@ -62,6 +62,7 @@ def generate_launch_description():
                 package='controller_manager',
                 executable='spawner',
                 name='joint_state_broadcaster_spawner',
+                prefix=['python3.12'],
                 arguments=[
                     'joint_state_broadcaster',
                     '--controller-manager', '/controller_manager',
@@ -82,6 +83,7 @@ def generate_launch_description():
                 package='controller_manager',
                 executable='spawner',
                 name='diff_drive_controller_spawner',
+                prefix=['python3.12'],
                 arguments=[
                     'diff_drive_controller',
                     '--controller-manager', '/controller_manager',
@@ -99,10 +101,28 @@ def generate_launch_description():
         period=7.0,
         actions=[
             Node(
+                package='vacuum_controller',
+                executable='cmd_vel_relay.py',
+                name='cmd_vel_relay',
+                prefix=['python3.12'],
+                parameters=[{'use_sim_time': use_sim_time}],
+                output='screen',
+            )
+        ],
+    )
+
+    # ── odom relay ─────────────────────────────────────────────────
+    # diff_drive_controller publishes /diff_drive_controller/odom.
+    # Relaying this to /odom satisfies downstream components (like RTAB-Map)
+    # that expect /odom topic by default.
+    odom_relay = TimerAction(
+        period=7.0,
+        actions=[
+            Node(
                 package='topic_tools',
                 executable='relay',
-                name='cmd_vel_relay',
-                arguments=['/cmd_vel', '/diff_drive_controller/cmd_vel'],
+                name='odom_relay',
+                arguments=['/diff_drive_controller/odom', '/odom'],
                 parameters=[{'use_sim_time': use_sim_time}],
                 output='screen',
             )
@@ -117,6 +137,7 @@ def generate_launch_description():
                 package='vacuum_controller',
                 executable='odometry_noise_node.py',
                 name='odometry_noise_node',
+                prefix=['python3.12'],
                 parameters=[{
                     'use_sim_time': use_sim_time,
                     'enable_noise': enable_noise,
@@ -137,6 +158,7 @@ def generate_launch_description():
                 package='vacuum_controller',
                 executable='motion_diagnostics_node.py',
                 name='motion_diagnostics_node',
+                prefix=['python3.12'],
                 parameters=[{
                     'use_sim_time': use_sim_time,
                     'cmd_vel_timeout_warn': 0.5,  # s — warn if no cmd for this long
@@ -157,6 +179,7 @@ def generate_launch_description():
                 package='vacuum_controller',
                 executable='camera_diagnostics_node.py',
                 name='camera_diagnostics_node',
+                prefix=['python3.12'],
                 parameters=[
                     camera_yaml,
                     {'use_sim_time': use_sim_time},
@@ -174,6 +197,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         diff_drive_controller_spawner,
         cmd_vel_relay,
+        odom_relay,
         odometry_noise_node,
         motion_diagnostics_node,
         camera_diagnostics_node,

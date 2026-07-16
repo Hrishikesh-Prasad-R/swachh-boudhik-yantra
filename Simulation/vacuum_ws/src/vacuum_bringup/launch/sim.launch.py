@@ -2,34 +2,36 @@
 # FIXED: ParameterValue wrapper — required in ROS2 Jazzy for XML parameters
 # Without this, launch parses URDF XML as YAML and throws an error.
 """
-sim.launch.py — MASTER simulation launch file (Stage 2)
-────────────────────────────────────────────────────────
+sim.launch.py — MASTER simulation launch file (Stage 3)
+────────────────────────────────────────────────────
 Orchestrates the complete simulation stack in this order:
 
   1. robot_state_publisher  — reads URDF, publishes /robot_description + TF
   2. Gazebo Harmonic        — physics simulation (loads gz_ros2_control plugin)
-  3. ros_gz_bridge          — /clock bridge only (Stage 2: ros2_control owns robot topics)
+  3. ros_gz_bridge          — /clock + camera topics (Stage 3)
   4. spawn_robot            — places the robot into Gazebo (delayed 3s)
-  5. controllers            — spawns JSB + diff_drive_controller (delayed 5–7s)
+  5. controllers            — spawns JSB + diff_drive_controller + camera diag
   6. RViz2 (optional)       — visualisation
 
-Stage 2 changes from Stage 1:
-  - gz_ros2_control replaces DiffDrive/JSP gz plugins
-  - Controllers launch (vacuum_controller) included
-  - Bridge reduced to /clock only
+Stage 3 changes:
+  - D435i RGB-D camera sensor active (rgbd_camera plugin)
+  - 5 camera topics bridged (image, depth, points, 2x camera_info)
+  - camera_diagnostics_node started at t=10s
 
 Launch arguments:
-  use_sim_time       [true]  — all nodes use /clock from Gazebo
-  use_rviz           [true]  — launch RViz2 alongside Gazebo
-  world_file         [empty_world.sdf] — path to Gazebo world file
-  spawn_x/y/yaw      [0.0]  — robot initial pose
-  enable_odom_noise  [false] — enable Gaussian noise on /odom_noisy
-  enable_diagnostics [true]  — enable motion diagnostics node
+  use_sim_time       [true]           — all nodes use /clock from Gazebo
+  use_rviz           [true]           — launch RViz2 alongside Gazebo
+  world              [room]           — shorthand: room/apartment/office/corridor
+  world_file         [empty_world.sdf]— override with absolute SDF path
+  spawn_x/y/yaw      [0.0]           — robot initial pose
+  enable_odom_noise  [false]          — Gaussian noise on /odom_noisy
+  enable_diagnostics [true]           — enable motion diagnostics node
 
 Usage:
   ros2 launch vacuum_bringup sim.launch.py
-  ros2 launch vacuum_bringup sim.launch.py use_rviz:=false
-  ros2 launch vacuum_bringup sim.launch.py enable_odom_noise:=true
+  ros2 launch vacuum_bringup sim.launch.py world:=apartment
+  ros2 launch vacuum_bringup sim.launch.py world:=office use_rviz:=false
+  ros2 launch vacuum_bringup sim.launch.py world_file:=/abs/path/custom.sdf
 """
 
 import os
@@ -45,6 +47,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     LaunchConfiguration,
     Command,
+    PythonExpression,
 )
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.actions import Node
@@ -59,8 +62,16 @@ def generate_launch_description():
     pkg_controller   = get_package_share_directory('vacuum_controller')
     pkg_ros_gz_sim   = get_package_share_directory('ros_gz_sim')
 
+    # ── World file map (shorthand -> SDF path) ─────────────────────
+    # Add new environments here; world_file arg overrides all.
+    WORLD_MAP = {
+        'room':      os.path.join(pkg_gazebo, 'worlds', 'empty_world.sdf'),
+        'apartment': os.path.join(pkg_gazebo, 'worlds', 'apartment.sdf'),
+        'office':    os.path.join(pkg_gazebo, 'worlds', 'office.sdf'),
+        'corridor':  os.path.join(pkg_gazebo, 'worlds', 'corridor.sdf'),
+    }
+
     # ── Default paths ──────────────────────────────────────────────
-    default_world   = os.path.join(pkg_gazebo,  'worlds', 'empty_world.sdf')
     default_rviz    = os.path.join(pkg_bringup, 'config', 'rviz_config.rviz')
     urdf_file       = os.path.join(pkg_description, 'urdf', 'vacuum.urdf.xacro')
     bridge_config   = os.path.join(pkg_gazebo,  'config', 'gz_bridge.yaml')
@@ -73,9 +84,24 @@ def generate_launch_description():
     declare_use_rviz = DeclareLaunchArgument(
         'use_rviz', default_value='true',
         description='Launch RViz2 for visualisation')
+    declare_world = DeclareLaunchArgument(
+        'world', default_value='room',
+        description='World shorthand: room | apartment | office | corridor'
+                    ' (ignored if world_file is set)')
+
+    # Dynamic world path resolution based on 'world' argument
+    world = LaunchConfiguration('world')
+    dynamic_world_default = PythonExpression([
+        "'", os.path.join(pkg_gazebo, 'worlds'), "/' + (",
+        "'empty_world.sdf' if '", world, "' == 'room' else ",
+        "'apartment.sdf' if '", world, "' == 'apartment' else ",
+        "'office.sdf' if '", world, "' == 'office' else ",
+        "'corridor.sdf' if '", world, "' == 'corridor' else 'empty_world.sdf')"
+    ])
+
     declare_world_file = DeclareLaunchArgument(
-        'world_file', default_value=default_world,
-        description='Absolute path to the Gazebo .sdf world file')
+        'world_file', default_value=dynamic_world_default,
+        description='Absolute path to the Gazebo .sdf world file (overrides world:=)')
     declare_spawn_x = DeclareLaunchArgument(
         'spawn_x', default_value='0.0',
         description='Initial X position of the robot')
@@ -195,6 +221,7 @@ def generate_launch_description():
         # Declare all arguments first
         declare_use_sim_time,
         declare_use_rviz,
+        declare_world,
         declare_world_file,
         declare_spawn_x,
         declare_spawn_y,
@@ -205,8 +232,8 @@ def generate_launch_description():
         # Launch in dependency order
         robot_state_publisher,  # must be before spawn (provides /robot_description)
         gazebo,
-        ros_gz_bridge,          # /clock only in Stage 2
+        ros_gz_bridge,          # /clock + camera topics (Stage 3)
         spawn_robot,            # delayed 3s — triggers gz_ros2_control init
-        controllers,            # delayed internally (5s JSB, 6s DDC)
+        controllers,            # delayed internally (5s JSB, 6s DDC, 10s camera_diag)
         rviz,
     ])

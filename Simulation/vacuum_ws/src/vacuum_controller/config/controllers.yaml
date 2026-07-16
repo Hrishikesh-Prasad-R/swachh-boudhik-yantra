@@ -38,8 +38,10 @@ controller_manager:
 # robot_state_publisher subscribes to /joint_states to publish TF for wheel links.
 joint_state_broadcaster:
   ros__parameters:
-    # Publish all joints by default — leave empty to broadcast all
-    joints: []
+    # Publish all joints by default
+    joints:
+      - left_wheel_joint
+      - right_wheel_joint
 
 
 # ── Differential Drive Controller ─────────────────────────────────────────────

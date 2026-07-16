@@ -26,6 +26,8 @@ install(
     vacuum_controller/odometry_noise_node.py
     vacuum_controller/motion_diagnostics_node.py
     vacuum_controller/camera_diagnostics_node.py
+    vacuum_controller/cmd_vel_relay.py
+    vacuum_controller/teleop_arrows.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

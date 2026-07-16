@@ -14,7 +14,11 @@ install(
     scripts/validate_camera.sh
     scripts/record_trajectory.py
     scripts/benchmark_camera.py
+    scripts/benchmark_slam.py
+    scripts/evaluate_trajectory.py
+    scripts/record_stage4.sh
     scripts/graphify.py
+    scripts/drive_robot.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
