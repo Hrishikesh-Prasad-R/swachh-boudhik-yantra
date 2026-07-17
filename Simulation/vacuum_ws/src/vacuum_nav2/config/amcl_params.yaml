@@ -1,0 +1,102 @@
+# amcl_params.yaml  —  Stage 5: AMCL Localization on Saved Map
+# ─────────────────────────────────────────────────────────────────────────────
+# Adaptive Monte Carlo Localization for the Swachh Boudhik Yantra vacuum robot.
+#
+# Sensor: Intel RealSense D435i depth image → /scan_from_depth (LaserScan)
+#         via depthimage_to_laserscan node (launched in nav2_localization.launch.py)
+#
+# Motion model: differential (two powered wheels, one caster)
+# Laser model:  likelihood_field (robust for sparse depth-derived scans)
+#
+# Key parameters:
+#   - scan_topic      : must match depthimage_to_laserscan output
+#   - update_min_d/a  : control when particle filter updates (tradeoff: accuracy vs CPU)
+#   - min/max_particles: 500–2000 is appropriate for a single-room indoor robot
+#   - transform_tolerance: must be generous (0.5–1.0 s) for simulation timing jitter
+#
+# AMCL provides the map → odom TF in Stage 5.
+# (RTAB-Map is NOT running in Stage 5 — AMCL replaces its TF output.)
+# ─────────────────────────────────────────────────────────────────────────────
+
+amcl:
+  ros__parameters:
+
+    # ── Frame IDs ──────────────────────────────────────────────────────────────
+    global_frame_id:  map
+    odom_frame_id:    odom
+    base_frame_id:    base_footprint
+
+    # ── Scan input ─────────────────────────────────────────────────────────────
+    # Must match the topic published by depthimage_to_laserscan.
+    scan_topic: /scan_from_depth
+
+    # ── Map input ──────────────────────────────────────────────────────────────
+    map_topic: /map
+
+    # ── Particle filter ────────────────────────────────────────────────────────
+    min_particles: 500          # minimum particles (accuracy floor)
+    max_particles: 2000         # maximum particles (CPU ceiling)
+    pf_err: 0.05                # desired accuracy (lower = more particles)
+    pf_z:   0.99                # probability the true distribution is within pf_err
+
+    # ── Update thresholds ──────────────────────────────────────────────────────
+    # Only update particle filter when robot has moved enough.
+    # Prevents CPU spikes when the robot is stationary.
+    update_min_d: 0.25          # m   — minimum linear displacement to trigger update
+    update_min_a: 0.2           # rad — minimum angular displacement (~11 degrees)
+    resample_interval: 1        # resample every N filter updates
+
+    # ── Differential drive motion model ────────────────────────────────────────
+    # alpha1–4: noise parameters for the motion model.
+    # Higher = more uncertainty assumed in motion.
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    alpha1: 0.2    # rotation noise from rotation
+    alpha2: 0.2    # rotation noise from translation
+    alpha3: 0.2    # translation noise from translation
+    alpha4: 0.2    # translation noise from rotation
+
+    # ── Laser model ────────────────────────────────────────────────────────────
+    # likelihood_field: robust, computationally efficient for sparse 2D scans.
+    laser_model_type:         likelihood_field
+    laser_max_range:          4.0     # m — D435i reliable max depth
+    laser_min_range:          0.2     # m — D435i reliable min depth
+    max_beams:                60      # beams to use per scan (subsampled for CPU)
+    laser_likelihood_max_dist: 2.0   # m — max dist for likelihood field lookup
+    sigma_hit:  0.2                   # stddev of hit beam distribution
+    z_hit:      0.5                   # weight of hit beam model
+    z_short:    0.05                  # weight of short readings
+    z_max:      0.05                  # weight of max range readings
+    z_rand:     0.4                   # weight of random/noise readings
+    lambda_short: 0.1                 # decay parameter for short reading model
+
+    # ── Beam skip (for sensor noise robustness) ────────────────────────────────
+    do_beamskip: false
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+
+    # ── Recovery (global relocalization) ──────────────────────────────────────
+    # When set > 0, AMCL injects random particles during localization failures.
+    # Disabled here — recovery_monitor.py handles kidnapped-robot cases.
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+
+    # ── TF / timing ────────────────────────────────────────────────────────────
+    tf_broadcast: true          # AMCL must broadcast map → odom TF
+    transform_tolerance: 1.0   # s — generous for simulation clock jitter
+    save_pose_rate: 0.5         # Hz — save estimated pose to parameter server
+
+    # ── Initial pose ───────────────────────────────────────────────────────────
+    # set_initial_pose: false = wait for RViz "2D Pose Estimate" click
+    # set_initial_pose: true  = use x/y/yaw below (e.g. docking location)
+    set_initial_pose: false
+    always_reset_initial_pose: false
+    first_map_only: false
+    initial_pose:
+      x:   0.0
+      y:   0.0
+      yaw: 0.0
+
+    # ── Map QoS ────────────────────────────────────────────────────────────────
+    # Transient local required for map_server (publishes once on startup).
+    map_subscribe_transient_local: true

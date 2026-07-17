@@ -1,0 +1,33 @@
+# localization_params.yaml  —  Stage 5: Localization Monitor Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+localization_monitor:
+  ros__parameters:
+    # ── Covariance thresholds ─────────────────────────────────────────────────
+    # Covariance trace = sum of position diagonal (x-var + y-var) of amcl_pose.
+    # Lower trace = tighter particle cloud = better localization.
+    cov_trace_good:     0.05   # below → GOOD state
+    cov_trace_warning:  0.25   # above → WARNING state
+    cov_trace_lost:     1.00   # above → LOST state
+
+    # ── Timeout ───────────────────────────────────────────────────────────────
+    # If no /amcl_pose update received within this time → LOST
+    pose_timeout_sec:   3.0
+
+    # ── Publisher rate ────────────────────────────────────────────────────────
+    publish_rate: 10.0          # Hz — /localization/status update rate
+
+recovery_monitor:
+  ros__parameters:
+    # ── Recovery sequence ─────────────────────────────────────────────────────
+    max_recovery_attempts: 3    # before aborting mission
+    spin_angle_rad: 6.28        # full 360° spin for relocalization
+    recovery_wait_sec: 2.0      # wait between recovery stages
+    cancel_goal_on_lost: true   # cancel active Nav2 goal when LOST
+
+localization_metrics:
+  ros__parameters:
+    output_base_dir:  "~/bags/stage5"
+    log_rate:         1.0       # Hz — CSV rows per second
+    environment:      "apartment"
+    map_file:         ""        # set at runtime

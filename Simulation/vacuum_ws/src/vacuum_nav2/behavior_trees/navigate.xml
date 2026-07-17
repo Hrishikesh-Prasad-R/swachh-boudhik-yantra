@@ -1,0 +1,88 @@
+<!--
+  navigate.xml  —  Stage 5: Goal Navigation Behavior Tree
+  ─────────────────────────────────────────────────────────────────────────────
+  Purpose:
+    Standard NavigateToPose BT for click-to-goal navigation on a known map.
+    Simpler than explore.xml — no BackUp recovery needed since the robot is
+    navigating through known, previously mapped space.
+
+  Recovery sequence (in order):
+    1. Clear local + global costmaps
+    2. Spin 90° — recover from momentary stuck
+    3. Wait 5 s  — allow sensor data to refresh
+
+  Future improvements (Stage 8 — Mission Manager):
+    - Add IsLocalizationLost condition → trigger recovery_monitor
+    - Add EnsureLocalization before starting path following
+    - Add ReturnToStart recovery node
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<root BTCPP_format="4" main_tree_to_execute="Navigate">
+
+  <BehaviorTree ID="Navigate">
+
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+
+      <!-- Primary: Replan at 1 Hz, follow path -->
+      <PipelineSequence name="NavigateWithReplanning">
+
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathRecovery">
+            <ComputePathToPose
+              goal="{goal}"
+              path="{path}"
+              planner_id="GridBased"
+              error_code_id="{compute_path_error_code}"/>
+            <ClearEntireCostmap
+              service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+
+        <RecoveryNode number_of_retries="1" name="FollowPathRecovery">
+          <FollowPath
+            path="{path}"
+            controller_id="FollowPath"
+            error_code_id="{follow_path_error_code}"/>
+          <ReactiveFallback name="FollowPathFallback">
+            <GoalUpdated/>
+            <RoundRobin name="LocalRecovery">
+              <Sequence name="ClearBothCostmaps">
+                <ClearEntireCostmap
+                  service_name="local_costmap/clear_entirely_local_costmap"/>
+                <ClearEntireCostmap
+                  service_name="global_costmap/clear_entirely_global_costmap"/>
+              </Sequence>
+              <Spin
+                spin_dist="1.57"
+                error_code_id="{spin_error_code}"/>
+              <Wait
+                wait_duration="5.0"
+                error_code_id="{wait_error_code}"/>
+            </RoundRobin>
+          </ReactiveFallback>
+        </RecoveryNode>
+
+      </PipelineSequence>
+
+      <!-- Top-level: last-resort recovery on total failure -->
+      <ReactiveFallback name="TopLevelFallback">
+        <GoalUpdated/>
+        <RoundRobin name="TopLevelRecovery">
+          <ClearEntireCostmap
+            service_name="local_costmap/clear_entirely_local_costmap"/>
+          <ClearEntireCostmap
+            service_name="global_costmap/clear_entirely_global_costmap"/>
+          <Spin
+            spin_dist="1.57"
+            error_code_id="{spin_error_code}"/>
+          <Wait
+            wait_duration="5.0"
+            error_code_id="{wait_error_code}"/>
+        </RoundRobin>
+      </ReactiveFallback>
+
+    </RecoveryNode>
+
+  </BehaviorTree>
+
+</root>

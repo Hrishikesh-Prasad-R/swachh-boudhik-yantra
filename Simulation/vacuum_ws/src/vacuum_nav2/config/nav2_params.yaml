@@ -1,4 +1,4 @@
-# nav2_params.yaml  —  Stage 4B: Nav2 for Autonomous Exploration
+# nav2_params.yaml  —  Stage 4B + Stage 5: Nav2 Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 # Nav2 configuration for Swachh Boudhik Yantra vacuum robot.
 #
@@ -7,8 +7,16 @@
 #   Footprint   : Circle, radius 0.18 m
 #   Max linear  : 0.30 m/s  (slow — indoor vacuum robot)
 #   Max angular : 1.0  rad/s
-#   Map source  : RTAB-Map (/rtabmap/map) — updated in real-time during exploration
-#   Localisation: RTAB-Map provides map→odom TF (no AMCL needed in Stage 4B)
+#
+# Stage 4B: map source = RTAB-Map (/rtabmap/map, live during exploration)
+#           localization = RTAB-Map provides map→odom TF
+# Stage 5:  map source = Map Server (/map, pre-built PGM)
+#           localization = AMCL particle filter provides map→odom TF
+#
+# Planners:
+#   Global : SmacPlannerHybrid (Hybrid A* — optimal for non-holonomic)
+#   Local  : MPPIController (smooth, tight-space capable)
+# ──────────────────────────────────────────────────────────────────────────────
 #
 # Planners:
 #   Global : SmacPlannerHybrid (Hybrid A* — optimal for non-holonomic)
@@ -300,7 +308,10 @@ global_costmap:
       static_layer:
         plugin: "nav2_costmap_2d/StaticLayer"
         map_subscribe_transient_local: true
-        map_topic: /rtabmap/map        # RTAB-Map updates this continuously
+        # Stage 4B: /rtabmap/map (live RTAB-Map updates)
+        # Stage 5:  /map        (Map Server — pre-built PGM)
+        # Both publish OccupancyGrid on this topic — the only difference is source.
+        map_topic: /map
       obstacle_layer:
         plugin: "nav2_costmap_2d/ObstacleLayer"
         enabled: true
@@ -358,12 +369,22 @@ local_costmap:
         inflation_radius: 0.35
       always_send_full_costmap: true
 
-# ── Map Server ────────────────────────────────────────────────────────────────
-# Not used in Stage 4B — RTAB-Map provides the live map directly.
-# Will be used in Stage 5 (localisation on pre-built map).
+# ── Map Server (Stage 5) ──────────────────────────────────────────────────────
+# yaml_filename set at runtime by nav2_localization.launch.py
+# In Stage 4B this section is unused — RTAB-Map is the map source.
 map_server:
   ros__parameters:
-    yaml_filename: ""
+    yaml_filename: ""       # overridden at launch time
+    frame_id: map
+    topic_name: /map
+
+# ── AMCL (Stage 5) ────────────────────────────────────────────────────────────
+# Full config in amcl_params.yaml — loaded separately by nav2_localization.launch.py
+# This stub is here so the lifecycle_manager can reference 'amcl' in both stages.
+amcl:
+  ros__parameters:
+    use_sim_time: true
+    # (actual params come from amcl_params.yaml at runtime)
 
 # ── Map Saver ─────────────────────────────────────────────────────────────────
 map_saver:
@@ -374,13 +395,20 @@ map_saver:
     map_subscribe_transient_local: true
 
 # ── Lifecycle Manager ─────────────────────────────────────────────────────────
+# Stage 4B node_names (exploration): omits map_server + amcl
+# Stage 5 node_names (localisation): full list including map_server + amcl
+#   — nav2_localization.launch.py overrides this list at runtime.
 lifecycle_manager:
   ros__parameters:
     autostart: true
     node_names:
+      # Stage 4B list (used by nav2.launch.py):
       - bt_navigator
       - planner_server
       - controller_server
       - behavior_server
       - smoother_server
       - velocity_smoother
+      # Stage 5 additions (used by nav2_localization.launch.py via override):
+      # - map_server
+      # - amcl
