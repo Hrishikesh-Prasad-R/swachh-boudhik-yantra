@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+            schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>vacuum_nav2</name>
+  <version>0.1.0</version>
+  <description>
+    Nav2 configuration for the Swachh Boudhik Yantra vacuum robot.
+    Introduced in Stage 4B to support autonomous frontier exploration.
+    Stage 5 will build on this foundation for localisation and goal-based navigation.
+  </description>
+  <maintainer email="rprasadhrishikesh@gmail.com">Hrishikesh-Prasad-R</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Nav2 runtime stack -->
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>nav2_bt_navigator</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_smac_planner</exec_depend>
+  <exec_depend>nav2_mppi_controller</exec_depend>
+  <exec_depend>nav2_behaviors</exec_depend>
+  <exec_depend>nav2_velocity_smoother</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+
+  <!-- Depth image to laser scan for local costmap -->
+  <exec_depend>depthimage_to_laserscan</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

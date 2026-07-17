@@ -1,0 +1,105 @@
+<!--
+  explore.xml  —  Stage 4B: Custom Exploration Behavior Tree
+  ─────────────────────────────────────────────────────────────────────────────
+  Purpose:
+    NavigateToPose BT customised for autonomous frontier exploration.
+    Identical to the Nav2 default BT in structure, but adds a BackUp recovery
+    node so the robot can escape near-wall situations that occur frequently
+    during frontier exploration.
+
+  Recovery sequence (in order):
+    1. Clear local costmap
+    2. Clear global costmap
+    3. Spin 90° — recover from stuck situations at frontiers
+    4. Wait 3 s  — allow map to update before replanning
+    5. Back up 0.15 m — escape walls / dead-end corners
+
+  Future improvements (Stage 5+):
+    - Add IsStuck condition with automatic goal cancellation
+    - Add custom RecoveryToNearestFreeCell node
+    - Add ExplorationComplete condition node
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<root BTCPP_format="4" main_tree_to_execute="ExploreNavigate">
+
+  <BehaviorTree ID="ExploreNavigate">
+
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+
+      <!-- Primary navigation sequence with replanning -->
+      <PipelineSequence name="NavigateWithReplanning">
+
+        <!-- Recompute path at 1 Hz -->
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathRecovery">
+            <ComputePathToPose
+              goal="{goal}"
+              path="{path}"
+              planner_id="GridBased"
+              error_code_id="{compute_path_error_code}"/>
+            <ClearEntireCostmap
+              service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+
+        <!-- Follow path with local recovery on failure -->
+        <RecoveryNode number_of_retries="1" name="FollowPathRecovery">
+          <FollowPath
+            path="{path}"
+            controller_id="FollowPath"
+            error_code_id="{follow_path_error_code}"/>
+          <ReactiveFallback name="FollowPathFallback">
+            <GoalUpdated/>
+            <RoundRobin name="LocalRecoveryActions">
+              <!-- Clear both costmaps first -->
+              <Sequence name="ClearCostmaps">
+                <ClearEntireCostmap
+                  service_name="local_costmap/clear_entirely_local_costmap"/>
+                <ClearEntireCostmap
+                  service_name="global_costmap/clear_entirely_global_costmap"/>
+              </Sequence>
+              <!-- Spin to reorient and observe environment -->
+              <Spin
+                spin_dist="1.57"
+                error_code_id="{spin_error_code}"/>
+              <!-- Back up to escape corners common in frontier exploration -->
+              <BackUp
+                backup_dist="0.15"
+                backup_speed="0.025"
+                error_code_id="{backup_error_code}"/>
+              <!-- Wait for map to update before retrying -->
+              <Wait
+                wait_duration="3.0"
+                error_code_id="{wait_error_code}"/>
+            </RoundRobin>
+          </ReactiveFallback>
+        </RecoveryNode>
+
+      </PipelineSequence>
+
+      <!-- Top-level recovery on total navigation failure -->
+      <ReactiveFallback name="TopLevelFallback">
+        <GoalUpdated/>
+        <RoundRobin name="TopLevelRecovery">
+          <ClearEntireCostmap
+            service_name="local_costmap/clear_entirely_local_costmap"/>
+          <ClearEntireCostmap
+            service_name="global_costmap/clear_entirely_global_costmap"/>
+          <Spin
+            spin_dist="1.57"
+            error_code_id="{spin_error_code}"/>
+          <Wait
+            wait_duration="5.0"
+            error_code_id="{wait_error_code}"/>
+          <BackUp
+            backup_dist="0.20"
+            backup_speed="0.025"
+            error_code_id="{backup_error_code}"/>
+        </RoundRobin>
+      </ReactiveFallback>
+
+    </RecoveryNode>
+
+  </BehaviorTree>
+
+</root>

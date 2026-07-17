@@ -1,0 +1,101 @@
+# exploration_params.yaml  —  Stage 4B: Autonomous Frontier Exploration
+# ─────────────────────────────────────────────────────────────────────────────
+# All tunable parameters for the exploration stack.
+# Nothing is hardcoded in the Python nodes — change parameters here.
+#
+# Parameter groups:
+#   frontier_detector   — what counts as a frontier
+#   goal_selector       — how to score and rank frontiers
+#   exploration_manager — lifecycle, recovery, termination
+#   metrics             — logging and output paths
+# ─────────────────────────────────────────────────────────────────────────────
+
+frontier_detector:
+  ros__parameters:
+    # ── Detection ────────────────────────────────────────────────────────────
+    map_topic: /rtabmap/map       # OccupancyGrid source (live RTAB-Map map)
+    publish_rate: 2.0             # Hz — how often to scan for new frontiers
+
+    # ── Clustering ───────────────────────────────────────────────────────────
+    # Frontier cells within cluster_radius of each other are merged into one
+    # candidate region. Prevents sending goals to adjacent pixels.
+    cluster_radius: 0.50          # m — merge frontier cells within this radius
+
+    # ── Filtering ─────────────────────────────────────────────────────────────
+    # Discard frontier clusters smaller than this threshold.
+    # Larger values = fewer, higher-quality frontiers (less noise).
+    # Smaller values = more frontiers (may include wall artifacts).
+    min_frontier_size: 5          # cells — minimum cluster size to publish
+
+goal_selector:
+  ros__parameters:
+    # ── Scoring weights ───────────────────────────────────────────────────────
+    # score(f) = weight_info_gain * size(f)
+    #          - weight_distance  * distance(robot, f)
+    #          - weight_obstacle  * obstacle_proximity_penalty(f)
+    #
+    # Tune these to adjust exploration strategy:
+    #   High weight_info_gain → prefers large unexplored regions
+    #   High weight_distance  → prefers nearby frontiers (greedy)
+    #   High weight_obstacle  → avoids frontiers near obstacles
+    weight_info_gain:        1.0
+    weight_distance:         1.5
+    weight_obstacle_penalty: 0.8
+
+    # ── Minimum goal distance ────────────────────────────────────────────────
+    # Ignore frontiers too close to the robot (already explored vicinity).
+    min_goal_distance: 0.30       # m
+
+exploration_manager:
+  ros__parameters:
+    # ── Navigation timeout ────────────────────────────────────────────────────
+    # Abandon a goal if Nav2 has not reached it in this time.
+    # Prevents the robot from getting stuck indefinitely on a bad frontier.
+    goal_timeout: 30.0            # s
+
+    # ── Retry and recovery ────────────────────────────────────────────────────
+    # Maximum retries per frontier before blacklisting it permanently (until expiry).
+    retry_count: 3
+
+    # ── Frontier blacklist ────────────────────────────────────────────────────
+    # Failed frontiers are blacklisted to prevent repeated attempts.
+    # After blacklist_expiry_sec, the frontier is eligible again
+    # (in case the map has been updated and the area is now reachable).
+    blacklist_expiry_sec: 60.0    # s — how long a frontier stays blacklisted
+
+    # ── Exploration completion conditions ─────────────────────────────────────
+    # Exploration does NOT stop just because no frontiers are found once.
+    # ALL of the following conditions must be met:
+    #
+    #   1. no_frontier_consecutive_checks consecutive detection cycles with 0 frontiers
+    #   2. map has not grown (free cells increased by < map_growth_threshold) in
+    #      the last map_growth_patience_sec seconds
+    #   3. robot is stationary (linear velocity < stationary_vel_threshold)
+    #
+    # This avoids premature termination during RTAB-Map update lags.
+    no_frontier_consecutive_checks: 5     # consecutive checks required
+    map_growth_patience_sec: 15.0         # s — monitoring window for map growth
+    map_growth_threshold: 10              # cells — ignore if map grows by this little
+    stationary_vel_threshold: 0.02        # m/s — below this = robot is stationary
+
+    # ── Oscillation detection ─────────────────────────────────────────────────
+    # If the robot has not moved > oscillation_distance in oscillation_timeout_sec,
+    # cancel the current goal and choose a different frontier.
+    oscillation_distance: 0.30    # m
+    oscillation_timeout_sec: 15.0 # s
+
+metrics:
+  ros__parameters:
+    # ── Output directories ────────────────────────────────────────────────────
+    # Metrics CSV and metadata YAML are saved here, organised by environment.
+    # Full path: output_base_dir/<environment>/run_<N>/metrics.csv
+    output_base_dir: ~/bags/stage4b
+
+    # ── Logging rate ─────────────────────────────────────────────────────────
+    log_rate: 1.0                 # Hz — write one CSV row per second
+
+    # ── Metadata fields ────────────────────────────────────────────────────────
+    # These are saved alongside every run in metadata.yaml.
+    # git_commit is auto-detected at launch time.
+    nav2_config: nav2_params.yaml
+    exploration_config: exploration_params.yaml
