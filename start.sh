@@ -50,7 +50,7 @@ if [[ "$MODE" == "explore" ]]; then
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
-        ros2 launch vacuum_exploration exploration.launch.py environment:=$ENV
+        python3.12 /opt/ros/jazzy/bin/ros2 launch vacuum_exploration exploration.launch.py environment:=$ENV
         exec bash
     " &
 
