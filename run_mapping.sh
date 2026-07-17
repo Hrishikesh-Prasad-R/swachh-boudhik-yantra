@@ -31,6 +31,7 @@ source /home/bmscecse/ros2_ws/install/setup.bash
 source /home/bmscecse/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/install/setup.bash
 
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=file:///home/bmscecse/Swachh_Boudhik_Yantra/cyclone_dds.xml
 export LD_LIBRARY_PATH=/home/bmscecse/ros2_ws/install/lib:$LD_LIBRARY_PATH
 export PATH=/home/bmscecse/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/bin:$PATH
 

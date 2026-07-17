@@ -50,6 +50,7 @@ if [[ "$MODE" == "explore" ]]; then
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
+        export CYCLONEDDS_URI=file://'$DIR'/cyclone_dds.xml
         python3.12 /opt/ros/jazzy/bin/ros2 launch vacuum_exploration exploration.launch.py environment:=$ENV
         exec bash
     " &
@@ -95,6 +96,7 @@ if [[ "$MODE" == "navigate" ]]; then
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
+        export CYCLONEDDS_URI=file://'$DIR'/cyclone_dds.xml
         python3.12 /opt/ros/jazzy/bin/ros2 launch vacuum_bringup sim.launch.py use_sim_time:=true
         exec bash
     " &
@@ -113,7 +115,8 @@ if [[ "$MODE" == "navigate" ]]; then
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
-        python3.12 /opt/ros/jazzy/bin/ros2 launch vacuum_nav2 nav2_localization.launch.py \
+        export CYCLONEDDS_URI=file://'$DIR'/cyclone_dds.xml
+        python3.12 /opt/ros/jazzy/bin/ros2 launch vacuum_nav2 nav2_localization.launch.py \\
             map_path:=$MAP_PATH environment:=$ENV
         exec bash
     " &

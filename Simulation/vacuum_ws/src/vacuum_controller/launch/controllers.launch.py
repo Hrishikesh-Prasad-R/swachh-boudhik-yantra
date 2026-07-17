@@ -56,7 +56,7 @@ def generate_launch_description():
     # joint states available to read encoder positions.
     # Delay 5s: robot spawns at 3s, give controller_manager 2 more seconds.
     joint_state_broadcaster_spawner = TimerAction(
-        period=5.0,
+        period=8.0,
         actions=[
             Node(
                 package='controller_manager',
@@ -77,7 +77,7 @@ def generate_launch_description():
     # The 1s gap between JSB and DDC avoids a race condition where DDC
     # tries to read joint states before JSB has activated.
     diff_drive_controller_spawner = TimerAction(
-        period=6.0,
+        period=10.0,
         actions=[
             Node(
                 package='controller_manager',
@@ -98,7 +98,7 @@ def generate_launch_description():
     # This relay node remaps that to the standard /cmd_vel.
     # Using topic_tools/relay keeps teleop commands simple.
     cmd_vel_relay = TimerAction(
-        period=7.0,
+        period=12.0,
         actions=[
             Node(
                 package='vacuum_controller',
@@ -116,7 +116,7 @@ def generate_launch_description():
     # Relaying this to /odom satisfies downstream components (like RTAB-Map)
     # that expect /odom topic by default.
     odom_relay = TimerAction(
-        period=7.0,
+        period=12.0,
         actions=[
             Node(
                 package='topic_tools',
@@ -131,7 +131,7 @@ def generate_launch_description():
 
     # ── Odometry Noise Node (optional) ─────────────────────────────
     odometry_noise_node = TimerAction(
-        period=8.0,
+        period=13.0,
         actions=[
             Node(
                 package='vacuum_controller',
@@ -152,7 +152,7 @@ def generate_launch_description():
 
     # ── Motion Diagnostics Node ─────────────────────────────────────
     motion_diagnostics_node = TimerAction(
-        period=8.0,
+        period=13.0,
         actions=[
             Node(
                 package='vacuum_controller',
@@ -173,7 +173,7 @@ def generate_launch_description():
     # Started 10s after launch to ensure the gz_bridge is publishing
     # and the camera topics have stabilised from startup transients.
     camera_diagnostics_node = TimerAction(
-        period=10.0,
+        period=15.0,
         actions=[
             Node(
                 package='vacuum_controller',

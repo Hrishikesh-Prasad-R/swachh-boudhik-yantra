@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  cyclone_dds.xml  —  Swachh Boudhik Yantra CycloneDDS Configuration
+  ──────────────────────────────────────────────────────────────────────
+  Increases the default participant index limit to handle the large number
+  of ROS2 nodes in the Stage 4B / Stage 5 exploration stack:
+
+    Gazebo, parameter_bridge, robot_state_publisher, rtabmap, rviz2,
+    bt_navigator, planner_server, controller_server, behavior_server,
+    smoother_server, velocity_smoother, lifecycle_manager,
+    depthimage_to_laserscan, frontier_detector, frontier_visualizer,
+    exploration_manager, exploration_metrics, cmd_vel_relay, odom_relay,
+    joint_state_broadcaster, diff_drive_controller, odometry_noise_node,
+    motion_diagnostics_node, camera_diagnostics_node ...
+
+  Default CycloneDDS MaxAutoParticipantIndex = 32, which is too small.
+  This config raises it to 200.
+
+  Usage (set in launch scripts):
+    export CYCLONEDDS_URI=file:///home/bmscecse/Swachh_Boudhik_Yantra/cyclone_dds.xml
+-->
+<CycloneDDS>
+  <Domain id="any">
+    <Discovery>
+      <MaxAutoParticipantIndex>200</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <!-- Raise socket buffer limits for large point cloud transfers -->
+      <SocketReceiveBufferSize min="1048576"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>
