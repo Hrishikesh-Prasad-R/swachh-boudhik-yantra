@@ -274,7 +274,8 @@ def main(args=None):
         if not node._csv_file.closed:
             node._csv_file.close()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

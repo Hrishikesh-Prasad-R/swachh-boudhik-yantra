@@ -25,12 +25,11 @@ controller_manager:
     # Higher = more responsive but more CPU. 50 Hz is the ROS2 standard.
     update_rate: 50  # Hz
 
-    # Register controllers (type determines the plugin to load)
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
-
-    diff_drive_controller:
-      type: diff_drive_controller/DiffDriveController
+    # NOTE: Controller type registrations (joint_state_broadcaster, diff_drive_controller)
+    # are intentionally NOT listed here. In ROS2 Jazzy, gz_ros2_control auto-loads
+    # controllers defined under controller_manager.ros__parameters, which conflicts
+    # with the explicit spawner nodes in controllers.launch.py.
+    # The spawner passes --param-file controllers.yaml to get the types.
 
 
 # ── Joint State Broadcaster ────────────────────────────────────────────────────

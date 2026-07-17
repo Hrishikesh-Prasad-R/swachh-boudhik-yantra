@@ -33,6 +33,10 @@ def generate_launch_description():
         get_package_share_directory('vacuum_gazebo'),
         'config', 'camera.yaml')
 
+    controllers_yaml = os.path.join(
+        get_package_share_directory('vacuum_controller'),
+        'config', 'controllers.yaml')
+
     # ── Arguments ──────────────────────────────────────────────────
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
@@ -54,7 +58,9 @@ def generate_launch_description():
     # ── joint_state_broadcaster ────────────────────────────────────
     # Must be spawned first: diff_drive_controller depends on having
     # joint states available to read encoder positions.
-    # Delay 5s: robot spawns at 3s, give controller_manager 2 more seconds.
+    # Delay 8s: robot spawns at 3s, give controller_manager 5 more seconds.
+    # -t: specify type explicitly so gz_ros2_control DOES NOT auto-load
+    #     from controllers.yaml (which caused 'already loaded, Failed configure')
     joint_state_broadcaster_spawner = TimerAction(
         period=8.0,
         actions=[
@@ -65,7 +71,9 @@ def generate_launch_description():
                 prefix=['python3.12'],
                 arguments=[
                     'joint_state_broadcaster',
+                    '-t', 'joint_state_broadcaster/JointStateBroadcaster',
                     '--controller-manager', '/controller_manager',
+                    '--controller-manager-timeout', '30',
                 ],
                 output='screen',
             )
@@ -73,8 +81,8 @@ def generate_launch_description():
     )
 
     # ── diff_drive_controller ──────────────────────────────────────
-    # Spawned after joint_state_broadcaster (6s total delay).
-    # The 1s gap between JSB and DDC avoids a race condition where DDC
+    # Spawned after joint_state_broadcaster (10s total delay).
+    # The 2s gap between JSB and DDC avoids a race condition where DDC
     # tries to read joint states before JSB has activated.
     diff_drive_controller_spawner = TimerAction(
         period=10.0,
@@ -86,7 +94,10 @@ def generate_launch_description():
                 prefix=['python3.12'],
                 arguments=[
                     'diff_drive_controller',
+                    '-t', 'diff_drive_controller/DiffDriveController',
                     '--controller-manager', '/controller_manager',
+                    '--controller-manager-timeout', '30',
+                    '--param-file', controllers_yaml,
                 ],
                 output='screen',
             )
