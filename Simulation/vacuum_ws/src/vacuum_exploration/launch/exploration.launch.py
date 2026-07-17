@@ -86,7 +86,10 @@ def generate_launch_description():
     sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [pkg_bringup, '/launch/sim.launch.py']),
-        launch_arguments={'use_sim_time': 'true'}.items(),
+        launch_arguments={
+            'use_sim_time': 'true',
+            'world':        environment,  # pass environment name as world selector
+        }.items(),
         condition=IfCondition(launch_sim),
     )
 
