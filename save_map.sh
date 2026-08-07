@@ -38,9 +38,12 @@ echo "  ⚠️  RTAB-Map must be running (do not Ctrl+C before this completes)"
 echo ""
 
 source /opt/ros/jazzy/setup.bash
+[ -f /home/bmscecse/ros2_ws/install/setup.bash ] && source /home/bmscecse/ros2_ws/install/setup.bash
 source "$HOME/Swachh_Boudhik_Yantra/Simulation/vacuum_ws/install/setup.bash"
 
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export ROS_DOMAIN_ID=0
+export CYCLONEDDS_URI="file://$HOME/Swachh_Boudhik_Yantra/cyclone_dds.xml"
 
 mkdir -p "$OUTPUT_DIR"
 

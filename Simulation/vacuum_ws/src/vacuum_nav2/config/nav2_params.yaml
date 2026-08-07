@@ -88,7 +88,7 @@ controller_server:
       vy_std: 0.0         # non-holonomic: no lateral velocity
       wz_std: 0.4
       vx_max: 0.30        # m/s — matches robot linear limit
-      vx_min: -0.10       # m/s — allow small reverse
+      vx_min: 0.0         # m/s — forward only (prevents continuous reverse driving)
       vy_max: 0.0
       wz_max: 1.0         # rad/s — matches robot angular limit
       iteration_count: 1
@@ -124,7 +124,7 @@ controller_server:
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0
+        cost_weight: 15.0
         threshold_to_consider: 0.5
       PathAlignCritic:
         enabled: true
@@ -155,7 +155,7 @@ controller_server:
         cost_power: 1
         cost_weight: 3.81
         critical_cost: 300.0
-        consider_footprint: true
+        consider_footprint: false   # robot_radius used in costmap — no polygon footprint defined
         collision_cost: 1000000.0
         near_goal_smoothing_factor: 0.1
 
@@ -165,7 +165,7 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_smac_planner/SmacPlannerHybrid"
+      plugin: "nav2_smac_planner::SmacPlannerHybrid"
       downsample_costmap: false
       downsampling_factor: 1
       tolerance: 0.30                    # m — goal position tolerance
@@ -177,7 +177,7 @@ planner_server:
       angle_quantization_bins: 72
       analytic_expansion_ratio: 3.5
       analytic_expansion_max_length: 3.0
-      analytic_expansion_max_cost: true
+      analytic_expansion_max_cost: 3.5      # float — max cost at which analytic expansion terminates
       analytic_expansion_max_cost_override: false
       minimum_turning_radius: 0.25      # m — tight turns for small robot
       reverse_penalty: 2.1
@@ -208,13 +208,13 @@ behavior_server:
     local_footprint_topic: local_costmap/published_footprint
     global_footprint_topic: global_costmap/published_footprint
     cycle_frequency: 10.0
-    behavior_plugins: ["spin", "back_up", "wait"]
+    behavior_plugins: ["spin", "backup", "wait"]
     spin:
-      plugin: "nav2_behaviors/Spin"
-    back_up:
-      plugin: "nav2_behaviors/BackUp"
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
     wait:
-      plugin: "nav2_behaviors/Wait"
+      plugin: "nav2_behaviors::Wait"
     local_frame: odom
     global_frame: map
     robot_base_frame: base_footprint
@@ -265,14 +265,14 @@ global_costmap:
       track_unknown_space: true        # required for frontier exploration
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       static_layer:
-        plugin: "nav2_costmap_2d/StaticLayer"
+        plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
         # Stage 4B: /rtabmap/map (live RTAB-Map updates)
         # Stage 5:  /map        (Map Server — pre-built PGM)
         # Both publish OccupancyGrid on this topic — the only difference is source.
         map_topic: /map
       obstacle_layer:
-        plugin: "nav2_costmap_2d/ObstacleLayer"
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         observation_sources: laser_scan
         laser_scan:
@@ -286,7 +286,7 @@ global_costmap:
           obstacle_max_range: 2.5
           obstacle_min_range: 0.2
       inflation_layer:
-        plugin: "nav2_costmap_2d/InflationLayer"
+        plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.35         # m — robot radius (0.18) + 0.17 safety margin
       always_send_full_costmap: true
@@ -309,7 +309,7 @@ local_costmap:
       track_unknown_space: false
       plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
-        plugin: "nav2_costmap_2d/ObstacleLayer"
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         observation_sources: laser_scan
         laser_scan:
@@ -323,7 +323,7 @@ local_costmap:
           obstacle_max_range: 2.5
           obstacle_min_range: 0.2
       inflation_layer:
-        plugin: "nav2_costmap_2d/InflationLayer"
+        plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.35
       always_send_full_costmap: true

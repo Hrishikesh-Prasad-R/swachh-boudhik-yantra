@@ -2,21 +2,24 @@
 """
 controllers.launch.py — Stage 3 (D435i + Controller Orchestration)
 ────────────────────────────────────────────────────────────────────
-Spawns ros2_control controllers AND the camera diagnostics node.
+Manages helper nodes for the ros2_control pipeline.
+
+IMPORTANT: joint_state_broadcaster and diff_drive_controller are NOT
+spawned here. gz_ros2_control reads the controller types from
+controllers.yaml (via <parameters> in _gazebo.xacro) and
+auto-loads + activates them at robot spawn time. Explicit spawner
+nodes would conflict (cannot configure an already-active controller).
 
 Startup sequence:
   t=0s   Gazebo starts with gz_ros2_control plugin
-  t=3s   Robot + D435i sensor spawned into Gazebo
-  t=5s   joint_state_broadcaster spawned
-  t=6s   diff_drive_controller spawned
-  t=7s   cmd_vel relay active
-  t=8s   OdometryNoiseNode + MotionDiagnosticsNode
-  t=10s  CameraDiagnosticsNode (waits for camera bridge to stabilise)
+  t=3s   Robot spawned; gz_ros2_control reads controllers.yaml,
+         auto-loads and activates JSB + DDC immediately
+  t=12s  cmd_vel relay + odom relay started
+  t=13s  OdometryNoiseNode + MotionDiagnosticsNode
+  t=15s  CameraDiagnosticsNode
 
 Usage:
   Included by vacuum_bringup/launch/sim.launch.py automatically.
-  Can also be run standalone:
-    ros2 launch vacuum_controller controllers.launch.py
 """
 
 import os
@@ -33,10 +36,6 @@ def generate_launch_description():
         get_package_share_directory('vacuum_gazebo'),
         'config', 'camera.yaml')
 
-    controllers_yaml = os.path.join(
-        get_package_share_directory('vacuum_controller'),
-        'config', 'controllers.yaml')
-
     # ── Arguments ──────────────────────────────────────────────────
     declare_use_sim_time = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
@@ -51,54 +50,40 @@ def generate_launch_description():
         'enable_camera_diagnostics', default_value='true',
         description='Enable D435i camera diagnostics node')
 
-    use_sim_time     = LaunchConfiguration('use_sim_time')
-    enable_noise     = LaunchConfiguration('enable_odom_noise')
-    enable_diag      = LaunchConfiguration('enable_diagnostics')
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    enable_noise = LaunchConfiguration('enable_odom_noise')
 
-    # ── joint_state_broadcaster ────────────────────────────────────
-    # Must be spawned first: diff_drive_controller depends on having
-    # joint states available to read encoder positions.
-    # Delay 8s: robot spawns at 3s, give controller_manager 5 more seconds.
-    # -t: specify type explicitly so gz_ros2_control DOES NOT auto-load
-    #     from controllers.yaml (which caused 'already loaded, Failed configure')
-    joint_state_broadcaster_spawner = TimerAction(
-        period=8.0,
+    # ── Controller Spawners ────────────────────────────────────────
+    # gz_ros2_control initialises the hardware interface (VacuumRobotHW)
+    # at robot spawn time (~T+3s), but does NOT auto-load controllers.
+    # Explicit spawners are required to load, configure, and activate
+    # joint_state_broadcaster and diff_drive_controller.
+    #
+    # T+5s gives gz_ros2_control ~2s after robot spawn to fully
+    # initialise the hardware before the spawners contact it.
+    jsb_spawner = TimerAction(
+        period=2.0,
         actions=[
             Node(
                 package='controller_manager',
                 executable='spawner',
-                name='joint_state_broadcaster_spawner',
+                name='jsb_spawner',
                 prefix=['python3.12'],
-                arguments=[
-                    'joint_state_broadcaster',
-                    '-t', 'joint_state_broadcaster/JointStateBroadcaster',
-                    '--controller-manager', '/controller_manager',
-                    '--controller-manager-timeout', '30',
-                ],
+                arguments=['joint_state_broadcaster', '--activate'],
                 output='screen',
             )
         ],
     )
 
-    # ── diff_drive_controller ──────────────────────────────────────
-    # Spawned after joint_state_broadcaster (10s total delay).
-    # The 2s gap between JSB and DDC avoids a race condition where DDC
-    # tries to read joint states before JSB has activated.
-    diff_drive_controller_spawner = TimerAction(
-        period=10.0,
+    ddc_spawner = TimerAction(
+        period=2.0,
         actions=[
             Node(
                 package='controller_manager',
                 executable='spawner',
-                name='diff_drive_controller_spawner',
+                name='ddc_spawner',
                 prefix=['python3.12'],
-                arguments=[
-                    'diff_drive_controller',
-                    '-t', 'diff_drive_controller/DiffDriveController',
-                    '--controller-manager', '/controller_manager',
-                    '--controller-manager-timeout', '30',
-                    '--param-file', controllers_yaml,
-                ],
+                arguments=['diff_drive_controller', '--activate'],
                 output='screen',
             )
         ],
@@ -106,8 +91,8 @@ def generate_launch_description():
 
     # ── cmd_vel relay ──────────────────────────────────────────────
     # diff_drive_controller subscribes to /diff_drive_controller/cmd_vel.
-    # This relay node remaps that to the standard /cmd_vel.
-    # Using topic_tools/relay keeps teleop commands simple.
+    # This relay remaps that to the standard /cmd_vel interface.
+    # Starts at T+12s (well after gz_ros2_control has activated DDC).
     cmd_vel_relay = TimerAction(
         period=12.0,
         actions=[
@@ -124,8 +109,7 @@ def generate_launch_description():
 
     # ── odom relay ─────────────────────────────────────────────────
     # diff_drive_controller publishes /diff_drive_controller/odom.
-    # Relaying this to /odom satisfies downstream components (like RTAB-Map)
-    # that expect /odom topic by default.
+    # Relay to /odom for Nav2, RTAB-Map and other downstream nodes.
     odom_relay = TimerAction(
         period=12.0,
         actions=[
@@ -152,8 +136,8 @@ def generate_launch_description():
                 parameters=[{
                     'use_sim_time': use_sim_time,
                     'enable_noise': enable_noise,
-                    'linear_noise_std':  0.005,   # m, σ for x/y position noise
-                    'angular_noise_std': 0.003,   # rad, σ for yaw noise
+                    'linear_noise_std':  0.005,
+                    'angular_noise_std': 0.003,
                     'rate_hz': 30.0,
                 }],
                 output='screen',
@@ -172,8 +156,8 @@ def generate_launch_description():
                 prefix=['python3.12'],
                 parameters=[{
                     'use_sim_time': use_sim_time,
-                    'cmd_vel_timeout_warn': 0.5,  # s — warn if no cmd for this long
-                    'publish_rate': 2.0,           # Hz — diagnostics publish rate
+                    'cmd_vel_timeout_warn': 0.5,
+                    'publish_rate': 2.0,
                 }],
                 output='screen',
             )
@@ -181,8 +165,6 @@ def generate_launch_description():
     )
 
     # ── Camera Diagnostics Node (Stage 3) ──────────────────────────
-    # Started 10s after launch to ensure the gz_bridge is publishing
-    # and the camera topics have stabilised from startup transients.
     camera_diagnostics_node = TimerAction(
         period=15.0,
         actions=[
@@ -205,8 +187,8 @@ def generate_launch_description():
         declare_enable_noise,
         declare_enable_diagnostics,
         declare_enable_cam_diag,
-        joint_state_broadcaster_spawner,
-        diff_drive_controller_spawner,
+        jsb_spawner,
+        ddc_spawner,
         cmd_vel_relay,
         odom_relay,
         odometry_noise_node,

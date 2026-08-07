@@ -81,7 +81,7 @@ class FrontierDetector(Node):
         # ── Map subscription (transient_local to catch the last published map) ─
         map_qos = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            durability=QoSDurabilityPolicy.VOLATILE,
             depth=1,
         )
         self.create_subscription(

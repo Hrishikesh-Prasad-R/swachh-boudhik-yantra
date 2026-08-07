@@ -60,6 +60,19 @@ def generate_launch_description():
         '═══════════════════════════════════════════════════════',
     ])
 
+    # ── /rtabmap/map → /map relay ─────────────────────────────────────────────
+    # RTAB-Map publishes OccupancyGrid on /rtabmap/map.
+    # Nav2 static_layer expects /map (nav2_params.yaml: map_topic: /map).
+    # This relay bridges the two so the global costmap is populated.
+    map_relay = Node(
+        package='topic_tools',
+        executable='relay',
+        name='rtabmap_map_relay',
+        arguments=['/rtabmap/map', '/map'],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen',
+    )
+
     # ── depthimage_to_laserscan ────────────────────────────────────────────────
     # Converts RealSense D435i depth image → /scan_from_depth (LaserScan).
     # This scan is used by Nav2's obstacle layer for real-time obstacle detection.
@@ -70,7 +83,7 @@ def generate_launch_description():
     depth_to_scan = Node(
         package='depthimage_to_laserscan',
         executable='depthimage_to_laserscan_node',
-        name='depth_to_scan',
+        name='depthimage_to_laserscan_node',
         output='screen',
         parameters=[{
             'use_sim_time':     use_sim_time,
@@ -164,12 +177,12 @@ def generate_launch_description():
             'use_sim_time': use_sim_time,
             'autostart': True,
             'node_names': [
-                'bt_navigator',
                 'planner_server',
                 'controller_server',
                 'behavior_server',
                 'smoother_server',
                 'velocity_smoother',
+                'bt_navigator',
             ],
         }],
     )
@@ -177,6 +190,7 @@ def generate_launch_description():
     return LaunchDescription([
         declare_use_sim_time,
         log_start,
+        map_relay,
         depth_to_scan,
         bt_navigator,
         planner_server,

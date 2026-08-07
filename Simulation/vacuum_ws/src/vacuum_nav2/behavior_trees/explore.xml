@@ -65,12 +65,11 @@
               <!-- Back up to escape corners common in frontier exploration -->
               <BackUp
                 backup_dist="0.15"
-                backup_speed="0.025"
+                backup_speed="0.08"
                 error_code_id="{backup_error_code}"/>
               <!-- Wait for map to update before retrying -->
               <Wait
-                wait_duration="3.0"
-                error_code_id="{wait_error_code}"/>
+                wait_duration="3.0"/>
             </RoundRobin>
           </ReactiveFallback>
         </RecoveryNode>
@@ -89,11 +88,10 @@
             spin_dist="1.57"
             error_code_id="{spin_error_code}"/>
           <Wait
-            wait_duration="5.0"
-            error_code_id="{wait_error_code}"/>
+            wait_duration="5.0"/>
           <BackUp
             backup_dist="0.20"
-            backup_speed="0.025"
+            backup_speed="0.08"
             error_code_id="{backup_error_code}"/>
         </RoundRobin>
       </ReactiveFallback>

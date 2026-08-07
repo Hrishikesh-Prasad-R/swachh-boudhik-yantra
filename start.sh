@@ -28,12 +28,25 @@ echo "╚═══════════════════════�
 echo ""
 
 # ────────────────────────────────────────────────────────────────
+#  MODE: stop  →  Emergency Stop & Clean All
+# ────────────────────────────────────────────────────────────────
+if [[ "$MODE" == "stop" ]]; then
+    bash "$DIR/stop.sh"
+    exit 0
+fi
+
+# ────────────────────────────────────────────────────────────────
 #  MODE: explore  →  Stage 4B Autonomous Frontier Exploration
 # ────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "explore" ]]; then
     ENV="${2:-apartment}"
     echo "  Mode        : Autonomous Exploration (Stage 4B)"
     echo "  Environment : $ENV"
+    echo ""
+    echo "[0/1] Stopping previous simulation instances and clearing map memory..."
+    bash "$DIR/stop.sh" >/dev/null 2>&1 || true
+    rm -rf ~/.ros/rtabmap.db*
+    echo "      Memory cleared."
     echo ""
     echo "[1/1] Launching full exploration stack in new window..."
     echo "      (Gazebo → SLAM → Nav2 → Exploration nodes)"
@@ -43,10 +56,12 @@ if [[ "$MODE" == "explore" ]]; then
         echo '╔══════════════════════════════════════════════════════╗'
         echo '║  Stage 4B: Autonomous Exploration                    ║'
         echo '║  Do NOT use the keyboard — robot drives itself.      ║'
+        echo '║  Press Ctrl+C here or run ./stop.sh to stop.          ║'
         echo '╚══════════════════════════════════════════════════════╝'
         echo ''
         cd '$DIR'
         source /opt/ros/jazzy/setup.bash
+        [ -f /home/bmscecse/ros2_ws/install/setup.bash ] && source /home/bmscecse/ros2_ws/install/setup.bash
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
@@ -56,6 +71,9 @@ if [[ "$MODE" == "explore" ]]; then
     " &
 
     echo "✅  Exploration launched!"
+    echo ""
+    echo "  Stop simulation & clear at any time:"
+    echo "    ./stop.sh  (or ./start.sh stop)"
     echo ""
     echo "  Monitor coverage in real time:"
     echo "    ros2 topic echo /exploration/status"
@@ -93,6 +111,7 @@ if [[ "$MODE" == "navigate" ]]; then
         echo '=== Gazebo Simulation (Stage 5) ==='
         cd '$DIR'
         source /opt/ros/jazzy/setup.bash
+        [ -f /home/bmscecse/ros2_ws/install/setup.bash ] && source /home/bmscecse/ros2_ws/install/setup.bash
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0
@@ -112,6 +131,7 @@ if [[ "$MODE" == "navigate" ]]; then
         echo '╚══════════════════════════════════════════════════════╝'
         cd '$DIR'
         source /opt/ros/jazzy/setup.bash
+        [ -f /home/bmscecse/ros2_ws/install/setup.bash ] && source /home/bmscecse/ros2_ws/install/setup.bash
         source Simulation/vacuum_ws/install/setup.bash
         export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
         export ROS_DOMAIN_ID=0

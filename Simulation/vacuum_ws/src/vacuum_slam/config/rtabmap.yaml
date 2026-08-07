@@ -36,14 +36,24 @@ rtabmap:
     subscribe_scan_cloud: false
     subscribe_odom_info:  false
 
+    qos_image:            2       # 2 = Best Effort / Volatile (drops old buffered frames)
+    qos_camera_info:      2       # 2 = Best Effort / Volatile
+
     # ── Synchronisation ────────────────────────────────────────────────────
     # approx_sync: allows small timestamp differences between RGB and depth.
     # Required for simulation because Gazebo bridge may introduce minor jitter.
     approx_sync:              true
-    approx_sync_max_interval: 0.02   # seconds — max RGB/depth time difference
+    approx_sync_max_interval: 0.05   # seconds — increased for DDS bridge jitter
 
     # Queue size: increase if dropping frames (at cost of RAM)
     queue_size: 10
+
+    # ── TF timing tolerance ─────────────────────────────────────────────────
+    # wait_for_transform: how long RTAB-Map waits for TF before giving up.
+    # Increase from default 0.2s to tolerate residual sim/wall clock drift.
+    wait_for_transform:    0.5      # seconds
+    tf_delay:              0.05     # seconds — delay before querying TF (helps jitter)
+    tf_tolerance:          0.1      # seconds — temporal tolerance for TF lookup
 
     # ── Database ───────────────────────────────────────────────────────────
     # RTAB-Map persists its map to an SQLite database.

@@ -22,14 +22,15 @@
 controller_manager:
   ros__parameters:
     # Control loop frequency — 50 Hz matches Gazebo physics step (1000 Hz / 20)
-    # Higher = more responsive but more CPU. 50 Hz is the ROS2 standard.
     update_rate: 50  # Hz
 
-    # NOTE: Controller type registrations (joint_state_broadcaster, diff_drive_controller)
-    # are intentionally NOT listed here. In ROS2 Jazzy, gz_ros2_control auto-loads
-    # controllers defined under controller_manager.ros__parameters, which conflicts
-    # with the explicit spawner nodes in controllers.launch.py.
-    # The spawner passes --param-file controllers.yaml to get the types.
+    # gz_ros2_control reads these type registrations on robot spawn and
+    # auto-loads + activates both controllers. No explicit spawner needed.
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    diff_drive_controller:
+      type: diff_drive_controller/DiffDriveController
 
 
 # ── Joint State Broadcaster ────────────────────────────────────────────────────
