@@ -111,8 +111,23 @@ def _nms(pred, conf_thr, iou_thr, allowed_ids):
     """Vectorised NMS with class filter. Returns (N,6) array [x1,y1,x2,y2,conf,cls]."""
     if pred.ndim == 3:
         pred = pred[0]
-    if pred.shape[0] < pred.shape[1]:
+
+    # Guard: empty prediction (e.g. no objects in frame or zero-size engine output)
+    if pred.size == 0 or pred.shape[0] == 0 or pred.shape[1] == 0:
+        return np.empty((0, 6), dtype=np.float32)
+
+    # YOLOv8 output can be (N, 4+C) or (4+C, N).
+    # Heuristic: if columns == 4+num_classes, it's already (N, 4+C).
+    # Only transpose when rows look like 4+C dimension (rows > cols suggests transposed).
+    # Using explicit check: if ncols <= 6 and nrows > ncols, it's (4+C, N).
+    nrows, ncols = pred.shape
+    if ncols < nrows and ncols <= 6:
         pred = pred.T                       # → (N, 4+C)
+
+    # Guard: after potential transpose, recheck
+    nrows, ncols = pred.shape
+    if nrows == 0 or ncols < 5:
+        return np.empty((0, 6), dtype=np.float32)
 
     scores  = pred[:, 4:].max(axis=1)
     cls_ids = pred[:, 4:].argmax(axis=1)
