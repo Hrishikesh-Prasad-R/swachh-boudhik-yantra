@@ -6,11 +6,21 @@ find_package(ament_cmake_python REQUIRED)
 
 ament_python_install_package(${PROJECT_NAME})
 
-install(
-  PROGRAMS
-    vacuum_localization/localization_monitor.py
-    vacuum_localization/recovery_monitor.py
-    vacuum_localization/localization_metrics.py
+install(PROGRAMS
+  vacuum_localization/localization_monitor.py
+  RENAME localization_monitor
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  vacuum_localization/recovery_monitor.py
+  RENAME recovery_monitor
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  vacuum_localization/localization_metrics.py
+  RENAME localization_metrics
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -20,3 +30,4 @@ install(
 )
 
 ament_package()
+

@@ -59,6 +59,9 @@ def generate_launch_description():
         '\n[map_saver] Saving map from /rtabmap/map ...\n',
         '  Output: ', output_dir, '/', map_name, '.pgm / .yaml\n',
         '  (nav2_map_server compatible format)\n',
+        '\n',
+        '  NOTE: RTAB-Map must be running and have built a map.\n',
+        '  If save fails, check: ros2 topic hz /rtabmap/map\n',
     ])
 
     map_saver = Node(
@@ -67,10 +70,14 @@ def generate_launch_description():
         name='map_saver',
         output='screen',
         arguments=[
+            # ── Output file path (without extension) ──
             '-f', [output_dir, '/', map_name],
             '--ros-args',
         ],
-        parameters=[{'use_sim_time': use_sim_time}],
+        parameters=[{
+            'use_sim_time': use_sim_time,
+            'save_map_timeout': 10.0
+        }],
     )
 
     return LaunchDescription([

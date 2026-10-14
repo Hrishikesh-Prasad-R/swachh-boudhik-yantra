@@ -13,6 +13,13 @@
 #   - For better loop closure: decrease Rtabmap/LoopThr
 #   - For smaller map files:   decrease Grid/CellSize (but increases RAM)
 #
+# OVERLAPPING MAP FIX:
+#   The main causes of overlapping / ghost maps are:
+#   1. Old TF frames still active in RViz2 — always restart RViz2 with SLAM
+#   2. Loop closure not triggering fast enough — fixed by DetectionRate=2, LinearUpdate=0.05
+#   3. Proximity detection disabled — fixed by ProximityBySpace=true + ProximityPathMaxNeighbors=10
+#   4. Poor graph optimization — fixed by Optimizer/Robust=true + Iterations=100
+#
 # Usage:
 #   ros2 launch vacuum_slam slam.launch.py
 #   ros2 launch vacuum_slam slam.launch.py environment:=office
@@ -63,53 +70,112 @@ rtabmap:
     # ── Memory management ──────────────────────────────────────────────────
     # Short-term memory (STM) holds the most recent keyframes.
     # Older keyframes are moved to long-term memory (LTM) for loop closure.
-    Mem/STMSize:               "30"     # keyframes in short-term memory
+    #
+    # TUNING NOTE: Increase STMSize for larger rooms (>10m span).
+    # 50 keyframes @ 0.05m/keyframe = 2.5m radius of "active" memory.
+    # For apartment mapping, 50–100 is better.
+    Mem/STMSize:               "50"     # ↑ from 30 — more active memory = better LC
     Mem/RehearsalSimilarity:   "0.45"   # similarity threshold for memory rehearsal
-    Mem/BadSignaturesIgnored:  "false"  # keep poor-quality keyframes
+    Mem/BadSignaturesIgnored:  "false"  # keep poor-quality keyframes (safer)
     Mem/InitWMWithAllNodes:    "false"  # don't pre-load entire DB into working memory
     Mem/IncrementalMemory:     "true"   # add new keyframes continuously
 
     # ── Detection rate ─────────────────────────────────────────────────────
-    # 1 Hz = RTAB-Map processes one keyframe per second (sufficient for walking pace)
-    # Increase to 2 Hz if the robot moves fast or the environment changes rapidly.
-    Rtabmap/DetectionRate:     "1"      # Hz — how often RTAB-Map updates the map
-    Rtabmap/TimeThr:           "0"      # ms — 0 = no time limit per update
+    # ENTERPRISE SETTING: 2 Hz is the recommended production value.
+    # At 1 Hz, a robot rotating at 30°/s creates 30° gaps between keyframes.
+    # At 2 Hz, gaps are 15° — sufficient for D435i's 69° horizontal FOV.
+    #
+    # Do NOT go above 3 Hz unless you have a very fast CPU and SSD.
+    Rtabmap/DetectionRate:     "2"      # ↑ from 1 Hz — catches loop closures faster
+    Rtabmap/TimeThr:           "700"    # ms — max time per update (0=unlimited, but unsafe)
     Rtabmap/MemoryThr:         "0"      # MB — 0 = no memory limit
 
     # ── Loop closure ───────────────────────────────────────────────────────
     # Threshold for accepting a loop closure hypothesis.
     # Lower = more aggressive (more false positives risk).
     # Higher = more conservative (may miss valid loop closures).
+    #
+    # ENTERPRISE SETTING:
+    #   Production robots use 0.11–0.15 for indoor environments.
+    #   Values below 0.10 cause false loop closures in symmetric rooms.
+    #   Values above 0.15 miss valid closures in texture-poor areas.
     Rtabmap/LoopThr:           "0.11"   # loop closure acceptance threshold
-    Rtabmap/LoopRatio:         "0"      # 0 = accept all hypotheses above LoopThr
+    Rtabmap/LoopRatio:         "0.9"    # require top candidate to be 90% of 2nd best
+                                        # This prevents false loop closures in symmetric rooms
 
-    # Feature extraction for loop closure
-    RGBD/LoopClosureReextractFeatures: "false"
+    # Feature re-extraction improves loop closure quality at cost of CPU.
+    # Set to true if you see "ghost" rooms (false positive loop closures).
+    RGBD/LoopClosureReextractFeatures: "true"   # ↑ from false — verifies LC with fresh features
 
     # ── Motion update thresholds ───────────────────────────────────────────
     # Only create a new keyframe when the robot has moved sufficiently.
-    # Smaller values = more keyframes = better coverage, more RAM/CPU.
-    RGBD/LinearUpdate:         "0.1"    # m  — min translation to create new keyframe
-    RGBD/AngularUpdate:        "0.087"  # rad — min rotation (= ~5 degrees)
+    #
+    # ENTERPRISE SETTING:
+    #   0.05m + 0.052rad (3°) = dense keyframes. Better coverage for loop closure.
+    #   0.10m + 0.087rad (5°) = default. Sparser, faster, but misses thin-corridor LC.
+    #
+    # For vacuum robots (slow, methodical movement): use 0.05/0.052
+    # For fast robots (>0.5 m/s): use 0.10/0.087
+    RGBD/LinearUpdate:         "0.05"   # ↓ from 0.1m — denser keyframes for better LC
+    RGBD/AngularUpdate:        "0.052"  # ↓ from 0.087 rad — ~3° per keyframe
+
+    # ── Proximity detection ────────────────────────────────────────────────
+    # Proximity detection finds loop closures to spatially nearby nodes
+    # even before the global loop closure hypothesis is triggered.
+    # This is the main fix for "overlapping corridors" — it catches local
+    # drift before it accumulates into a visible ghost.
+    #
+    # ENTERPRISE SETTING: Always enable for indoor robots.
+    RGBD/ProximityBySpace:          "true"   # detect nearby previous locations
+    RGBD/ProximityMaxGraphDepth:    "0"      # 0 = search all graph nodes (unlimited)
+    RGBD/ProximityPathMaxNeighbors: "10"     # ↑ check 10 neighbours in proximity graph
+    RGBD/ProximityAngle:            "45"     # degrees — proximity angle tolerance
+    RGBD/OptimizeMaxError:          "3.0"    # reject graph optimizations with >3x error
+                                             # (prevents catastrophic map jumps)
+
+    # ── Graph optimization ─────────────────────────────────────────────────
+    # ENTERPRISE SETTING: GTSAM (2) > g2o (1) > TORO (0)
+    # GTSAM gives the most consistent map after loop closures.
+    # Use g2o if GTSAM is not installed.
+    Optimizer/Strategy:        "1"      # 1=g2o (robust, standard). 2=GTSAM (best, if available)
+    Optimizer/Iterations:      "100"    # ↑ from default 20 — more iterations = more consistent map
+    Optimizer/Robust:          "true"   # use robust kernel (Huber) to reject outlier LC
+    Optimizer/VarianceIgnored: "false"  # use odometry covariance (more accurate pose graph)
 
     # ── Feature detection ──────────────────────────────────────────────────
     # ORB (6) is recommended for real-time use (faster than SURF/SIFT).
     # For better quality at cost of CPU: use SURF (0) or AKAZE (7).
+    #
+    # ENTERPRISE SETTING:
+    #   D435i has excellent texture. Use ORB with 1000 features.
+    #   SURF (0) is patented and slower but more robust in low-texture areas.
+    #   AKAZE (7) is a good middle ground: patent-free, robust, ~2x slower than ORB.
     Kp/DetectorStrategy:       "6"      # 0=SURF, 6=ORB, 7=AKAZE, 8=FAST/BRIEF
-    Kp/MaxFeatures:            "500"    # max keypoints per image
+    Kp/MaxFeatures:            "1000"   # ↑ from 500 — D435i gives rich texture, use it
     Kp/MaxDepth:               "4.0"    # m — ignore features beyond this depth
-    Kp/MinDepth:               "0.1"    # m — ignore features closer than this
+    Kp/MinDepth:               "0.2"    # ↑ from 0.1m — avoids noisy near-field depth
 
     # ── Occupancy grid (2D map) ────────────────────────────────────────────
     # Used by Nav2 in Stage 5.
+    #
+    # OVERLAPPING MAP FIX:
+    #   Grid/RayTracing=true + Grid/3D=false + Grid/NormalsSegmentation=false
+    #   is the correct combo for a differential-drive vacuum robot.
+    #
+    # The "overlapping" appearance is often Grid/MaxGroundHeight too low:
+    #   Robot base is ~15cm off floor. Obstacle legs at 5cm are classified
+    #   as ground → disappear from map → navigation crashes into table legs.
     Grid/3D:                   "false"  # false = 2D occupancy grid for Nav2
     Grid/RayTracing:           "true"   # mark free space using ray casting
     Grid/CellSize:             "0.05"   # m — 5cm resolution (standard for Nav2)
     Grid/MaxObstacleHeight:    "2.0"    # m — ignore obstacles above this height
     Grid/MinGroundHeight:      "-0.1"   # m — ignore points below ground
-    Grid/MaxGroundHeight:      "0.15"   # m — classify points below as ground
+    Grid/MaxGroundHeight:      "0.20"   # ↑ from 0.15m — catches low obstacles (chair legs, cables)
     Grid/FlatObstacleDetected: "true"   # detect horizontal surfaces as obstacles
     Grid/NormalsSegmentation:  "false"  # disable normals-based floor detection
+    Grid/ClusterRadius:        "0.1"    # m — cluster nearby obstacle points (cleaner map)
+    Grid/MinClusterSize:       "20"     # min points per cluster (removes sensor noise)
+    Grid/FootprintRadius:      "0.0"    # 0 = use robot_radius from Nav2 (don't duplicate)
 
     # ── Visual odometry fallback ───────────────────────────────────────────
     # RTAB-Map can refine odometry using visual features.

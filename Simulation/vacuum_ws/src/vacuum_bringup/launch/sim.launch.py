@@ -85,7 +85,7 @@ def generate_launch_description():
         'use_rviz', default_value='true',
         description='Launch RViz2 for visualisation')
     declare_world = DeclareLaunchArgument(
-        'world', default_value='room',
+        'world', default_value='apartment',
         description='World shorthand: room | apartment | office | corridor'
                     ' (ignored if world_file is set)')
 
@@ -156,7 +156,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             'gz_args': ['-r ', world_file],
-            'on_exit_shutdown': 'true',
+            'on_exit_shutdown': 'false',  # Don't kill all nodes if Gazebo exits
         }.items(),
     )
 

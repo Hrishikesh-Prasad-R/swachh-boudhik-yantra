@@ -73,7 +73,8 @@ class SteeringGUI:
         self.root = tk.Tk()
         self.root.title("🤖  Vacuum Bot Steering")
         self.root.configure(bg=self.BG)
-        self.root.resizable(False, False)
+        self.root.geometry("600x650")
+        self.root.resizable(True, True)
 
         self._build_ui()
         self._bind_keys()
@@ -85,89 +86,101 @@ class SteeringGUI:
     def _build_ui(self):
         root = self.root
 
+        # Configure root grid weights for responsive scaling
+        for col in range(3):
+            root.grid_columnconfigure(col, weight=1)
+        root.grid_rowconfigure(2, weight=3)  # D-Pad area scales up
+        root.grid_rowconfigure(3, weight=1)  # Sliders area
+
         # Title
         tk.Label(
             root, text="Swachh Boudhik Yantra", bg=self.BG, fg=self.ACCENT,
-            font=("Helvetica", 10, "italic")
+            font=("Helvetica", 12, "italic")
         ).grid(row=0, column=0, columnspan=3, pady=(12, 0))
 
         tk.Label(
             root, text="Robot Steering Panel", bg=self.BG, fg=self.FG,
-            font=("Helvetica", 14, "bold")
+            font=("Helvetica", 18, "bold")
         ).grid(row=1, column=0, columnspan=3, pady=(0, 10))
 
         # ── D-Pad ──────────────────────────────────────────────
         pad = tk.Frame(root, bg=self.BG)
-        pad.grid(row=2, column=0, columnspan=3, padx=20, pady=5)
+        pad.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky="nsew")
 
-        btn_cfg = dict(width=5, height=2, font=("Helvetica", 16, "bold"),
+        for r in range(3):
+            pad.grid_rowconfigure(r, weight=1)
+        for c in range(3):
+            pad.grid_columnconfigure(c, weight=1)
+
+        btn_cfg = dict(font=("Helvetica", 22, "bold"),
                        relief="flat", bd=0, cursor="hand2",
                        activebackground=self.BTN_ACTIVE, activeforeground="white")
 
         self.btn_fwd = tk.Button(pad, text="▲", bg=self.BTN_NAV, fg=self.FG, **btn_cfg)
-        self.btn_fwd.grid(row=0, column=1, padx=4, pady=4)
+        self.btn_fwd.grid(row=0, column=1, padx=6, pady=6, sticky="nsew")
         self.btn_fwd.bind("<ButtonPress-1>",   lambda e: self._active_keys.add("fwd"))
         self.btn_fwd.bind("<ButtonRelease-1>",  lambda e: (self._active_keys.discard("fwd"), self._stop_if_idle()))
 
         self.btn_left = tk.Button(pad, text="◀", bg=self.BTN_NAV, fg=self.FG, **btn_cfg)
-        self.btn_left.grid(row=1, column=0, padx=4, pady=4)
+        self.btn_left.grid(row=1, column=0, padx=6, pady=6, sticky="nsew")
         self.btn_left.bind("<ButtonPress-1>",   lambda e: self._active_keys.add("left"))
         self.btn_left.bind("<ButtonRelease-1>",  lambda e: (self._active_keys.discard("left"), self._stop_if_idle()))
 
         self.btn_stop = tk.Button(pad, text="■", bg=self.BTN_STOP, fg="white", **btn_cfg)
-        self.btn_stop.grid(row=1, column=1, padx=4, pady=4)
+        self.btn_stop.grid(row=1, column=1, padx=6, pady=6, sticky="nsew")
         self.btn_stop.bind("<ButtonPress-1>",   lambda e: self._stop())
 
         self.btn_right = tk.Button(pad, text="▶", bg=self.BTN_NAV, fg=self.FG, **btn_cfg)
-        self.btn_right.grid(row=1, column=2, padx=4, pady=4)
+        self.btn_right.grid(row=1, column=2, padx=6, pady=6, sticky="nsew")
         self.btn_right.bind("<ButtonPress-1>",  lambda e: self._active_keys.add("right"))
         self.btn_right.bind("<ButtonRelease-1>", lambda e: (self._active_keys.discard("right"), self._stop_if_idle()))
 
         self.btn_back = tk.Button(pad, text="▼", bg=self.BTN_NAV, fg=self.FG, **btn_cfg)
-        self.btn_back.grid(row=2, column=1, padx=4, pady=4)
+        self.btn_back.grid(row=2, column=1, padx=6, pady=6, sticky="nsew")
         self.btn_back.bind("<ButtonPress-1>",   lambda e: self._active_keys.add("back"))
         self.btn_back.bind("<ButtonRelease-1>",  lambda e: (self._active_keys.discard("back"), self._stop_if_idle()))
 
         # ── Speed sliders ──────────────────────────────────────
         sliders = tk.Frame(root, bg=self.BG)
-        sliders.grid(row=3, column=0, columnspan=3, padx=20, pady=10)
+        sliders.grid(row=3, column=0, columnspan=3, padx=30, pady=10, sticky="ew")
+        sliders.grid_columnconfigure(0, weight=1)
 
         tk.Label(sliders, text="Linear Speed (m/s)", bg=self.BG, fg=self.FG,
-                 font=("Helvetica", 9)).grid(row=0, column=0, sticky="w")
+                 font=("Helvetica", 11, "bold")).grid(row=0, column=0, sticky="w")
         self.linear_var = tk.DoubleVar(value=0.3)
         self.linear_slider = tk.Scale(
             sliders, from_=0.05, to=1.0, resolution=0.05,
             orient="horizontal", variable=self.linear_var,
             bg=self.CARD, fg=self.FG, troughcolor=self.SLIDER_TROUGH,
-            highlightthickness=0, length=220, showvalue=True
+            highlightthickness=0, showvalue=True
         )
-        self.linear_slider.grid(row=1, column=0, pady=2)
+        self.linear_slider.grid(row=1, column=0, pady=4, sticky="ew")
 
         tk.Label(sliders, text="Angular Speed (rad/s)", bg=self.BG, fg=self.FG,
-                 font=("Helvetica", 9)).grid(row=2, column=0, sticky="w")
+                 font=("Helvetica", 11, "bold")).grid(row=2, column=0, sticky="w")
         self.angular_var = tk.DoubleVar(value=0.8)
         self.angular_slider = tk.Scale(
             sliders, from_=0.1, to=2.0, resolution=0.1,
             orient="horizontal", variable=self.angular_var,
             bg=self.CARD, fg=self.FG, troughcolor=self.SLIDER_TROUGH,
-            highlightthickness=0, length=220, showvalue=True
+            highlightthickness=0, showvalue=True
         )
-        self.angular_slider.grid(row=3, column=0, pady=2)
+        self.angular_slider.grid(row=3, column=0, pady=4, sticky="ew")
 
         # ── Live readout ────────────────────────────────────────
         self.readout_var = tk.StringVar(value="linear: 0.00  angular: 0.00")
         tk.Label(
             root, textvariable=self.readout_var, bg=self.CARD, fg=self.BTN_FWD,
-            font=("Courier", 11, "bold"), pady=6, padx=10,
-            relief="flat", width=30
-        ).grid(row=4, column=0, columnspan=3, pady=(0, 6))
+            font=("Courier", 14, "bold"), pady=8, padx=12,
+            relief="flat"
+        ).grid(row=4, column=0, columnspan=3, pady=(5, 6), sticky="ew", padx=30)
 
         # ── Keyboard hint ───────────────────────────────────────
         tk.Label(
             root,
-            text="Arrow keys work anywhere in this window\nSpace = Stop",
-            bg=self.BG, fg="#888888", font=("Helvetica", 8)
-        ).grid(row=5, column=0, columnspan=3, pady=(0, 12))
+            text="Arrow keys work anywhere in this window | Space = Stop",
+            bg=self.BG, fg="#a0a0a0", font=("Helvetica", 10)
+        ).grid(row=5, column=0, columnspan=3, pady=(0, 15))
 
     # ── Key bindings ─────────────────────────────────────────────────────
     def _bind_keys(self):

@@ -104,7 +104,13 @@ diff_drive_controller:
 
     # cmd_vel_timeout: stop the robot if no command received for this many seconds.
     # This is a critical safety feature — prevents runaway on network interruption.
-    cmd_vel_timeout: 0.5  # seconds
+    #
+    # SIMULATION NOTE: Set to 1.5s because Gazebo sim-time runs faster than wall
+    # clock. The steer GUI publishes with wall-clock stamps; by the time the
+    # diff_drive_controller receives them, they appear ~0.8s "old" in sim-time.
+    # Log evidence: "older than current time by 0.884s, exceeds timeout (0.5s)"
+    # Hardware value should be 0.5s (restore before deploying to Jetson).
+    cmd_vel_timeout: 1.5  # seconds (sim) — restore to 0.5 for hardware
 
     # ── Velocity limits ───────────────────────────────────────────────────────
     # These limits are applied AFTER the command is received.

@@ -176,13 +176,17 @@ class ExplorationManager(Node):
         self._latest_map: Optional[OccupancyGrid] = None
 
         # ── Subscriptions ─────────────────────────────────────────────────────
+        # RTABMap publishes OccupancyGrid on /map with TRANSIENT_LOCAL durability.
+        # TRANSIENT_LOCAL subscriber is required to receive the last-published map
+        # on startup (behaves like a latched topic).
         map_qos = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             depth=1,
         )
+        # RTABMap publishes OccupancyGrid on /map (not /rtabmap/map).
         self.create_subscription(
-            OccupancyGrid, '/rtabmap/map', self._map_callback, map_qos)
+            OccupancyGrid, '/map', self._map_callback, map_qos)
         self.create_subscription(
             PoseArray, '/frontiers/centroids', self._frontiers_callback, 10)
         self.create_subscription(

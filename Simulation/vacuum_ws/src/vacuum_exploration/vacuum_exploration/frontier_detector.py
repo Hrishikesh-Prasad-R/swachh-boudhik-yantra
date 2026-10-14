@@ -64,7 +64,7 @@ class FrontierDetector(Node):
         super().__init__('frontier_detector')
 
         # ── Parameters ────────────────────────────────────────────────────────
-        self.declare_parameter('map_topic',        '/rtabmap/map')
+        self.declare_parameter('map_topic',        '/map')  # RTABMap publishes on /map
         self.declare_parameter('publish_rate',     2.0)
         self.declare_parameter('cluster_radius',   0.50)
         self.declare_parameter('min_frontier_size', 5)
@@ -79,9 +79,10 @@ class FrontierDetector(Node):
         self._frontiers:  List[Frontier] = []
 
         # ── Map subscription (transient_local to catch the last published map) ─
+        # RTABMap publishes OccupancyGrid on /map with TRANSIENT_LOCAL durability.
         map_qos = QoSProfile(
             reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.VOLATILE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             depth=1,
         )
         self.create_subscription(

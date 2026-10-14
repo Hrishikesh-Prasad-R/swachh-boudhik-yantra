@@ -60,18 +60,10 @@ def generate_launch_description():
         '═══════════════════════════════════════════════════════',
     ])
 
-    # ── /rtabmap/map → /map relay ─────────────────────────────────────────────
-    # RTAB-Map publishes OccupancyGrid on /rtabmap/map.
-    # Nav2 static_layer expects /map (nav2_params.yaml: map_topic: /map).
-    # This relay bridges the two so the global costmap is populated.
-    map_relay = Node(
-        package='topic_tools',
-        executable='relay',
-        name='rtabmap_map_relay',
-        arguments=['/rtabmap/map', '/map'],
-        parameters=[{'use_sim_time': use_sim_time}],
-        output='screen',
-    )
+    # NOTE: RTABMap publishes OccupancyGrid directly on /map.
+    # No relay node needed — Nav2 global_costmap static_layer subscribes to /map
+    # directly. A relay from /rtabmap/map → /map was previously here but caused
+    # the relay to wait indefinitely for a topic that never gets published.
 
     # ── depthimage_to_laserscan ────────────────────────────────────────────────
     # Converts RealSense D435i depth image → /scan_from_depth (LaserScan).
@@ -190,7 +182,6 @@ def generate_launch_description():
     return LaunchDescription([
         declare_use_sim_time,
         log_start,
-        map_relay,
         depth_to_scan,
         bt_navigator,
         planner_server,

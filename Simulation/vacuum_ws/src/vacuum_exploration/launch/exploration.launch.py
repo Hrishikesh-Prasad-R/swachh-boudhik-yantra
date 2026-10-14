@@ -88,7 +88,8 @@ def generate_launch_description():
             [pkg_bringup, '/launch/sim.launch.py']),
         launch_arguments={
             'use_sim_time': 'true',
-            'world':        environment,  # pass environment name as world selector
+            'world':        environment,
+            'use_rviz':     'false',   # exploration.launch.py starts its own RViz2 at T+28s
         }.items(),
         condition=IfCondition(launch_sim),
     )

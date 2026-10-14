@@ -50,7 +50,7 @@ mkdir -p "$OUTPUT_DIR"
 echo "[saving] Running map_saver_cli..."
 python3.12 /opt/ros/jazzy/bin/ros2 run nav2_map_server map_saver_cli \
     -f "$OUTPUT_DIR/$MAP_NAME" \
-    --ros-args -p use_sim_time:=true
+    --ros-args -p use_sim_time:=true -p save_map_timeout:=10.0
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
